@@ -17,6 +17,7 @@
 package android.location;
 
 import android.app.PendingIntent;
+import android.content.Intent;
 import android.location.Address;
 import android.location.Criteria;
 import android.location.GeocoderParams;
@@ -88,4 +89,7 @@ interface ILocationManager
 
     // for NI support
     boolean sendNiResponse(int notifId, int userResponse);
+
+    // for LocationHelper support
+    void broadcastToLocationHelper(in Intent intent);
 }

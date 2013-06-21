@@ -164,6 +164,128 @@ public class LocationManager {
     private HashMap<LocationListener,ListenerTransport> mListeners =
         new HashMap<LocationListener,ListenerTransport>();
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // LocationHelper code
+
+    // actions for broadcast intents
+    public static final String LOCATION_HELPER_START_ACTION =
+            "org.mitre.svmp.locationhelper.START_ACTION";
+    public static final String LOCATION_HELPER_STOP_ACTION =
+            "org.mitre.svmp.locationhelper.STOP_ACTION";
+
+    private class SubscriptionProperties {
+        private String provider;
+        private long minTime;
+        private float minDistance;
+        private boolean singleShot;
+
+        public SubscriptionProperties(String provider, long minTime, float minDistance, boolean singleShot){
+            this.provider = provider;
+            this.minTime = minTime;
+            this.minDistance = minDistance;
+            this.singleShot = singleShot;
+        }
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public long getMinTime() {
+            return minTime;
+        }
+
+        public float getMinDistance() {
+            return minDistance;
+        }
+
+        public boolean isSingleShot() {
+            return singleShot;
+        }
+    }
+
+    // Map from LocationListeners to their associated providers
+    private HashMap<LocationListener,SubscriptionProperties> mListenerProviders =
+            new HashMap<LocationListener,SubscriptionProperties>() {
+                @Override
+                public SubscriptionProperties put(LocationListener locationListener, SubscriptionProperties sp) {
+                    // only send to LocationHelper and add to HashMap if the provider is NOT the Passive provider
+                    if( !sp.getProvider().equals(PASSIVE_PROVIDER) ) {
+                        // send to LocationHelper
+                        startUpdates(sp);
+
+                        // if it's a single shot update, we don't add it to the HashMap
+                        if( !sp.isSingleShot() )
+                            return super.put(locationListener, sp);
+                    }
+                    return null;
+                }
+                @Override
+                public SubscriptionProperties remove(Object o) {
+                    SubscriptionProperties sp = super.remove(o);
+
+                    if( sp != null )
+                        stopUpdates(sp);
+
+                    return sp;
+                }
+            };
+    // Map from PendingIntents to their associated providers
+    private HashMap<PendingIntent,SubscriptionProperties> mPendingIntentProviders =
+            new HashMap<PendingIntent,SubscriptionProperties>() {
+                @Override
+                public SubscriptionProperties put(PendingIntent pendingIntent, SubscriptionProperties sp) {
+                    // only send to LocationHelper and add to HashMap if the provider is NOT the Passive provider
+                    if( !sp.getProvider().equals(PASSIVE_PROVIDER) ) {
+                        // send to LocationHelper
+                        startUpdates(sp);
+
+                        // if it's a single shot update, we don't add it to the HashMap
+                        if( !sp.isSingleShot() )
+                            return super.put(pendingIntent, sp);
+                    }
+                    return null;
+                }
+                @Override
+                public SubscriptionProperties remove(Object o) {
+                    SubscriptionProperties sp = super.remove(o);
+
+                    if( sp != null )
+                        stopUpdates(sp);
+
+                    return sp;
+                }
+            };
+
+    private void startUpdates(SubscriptionProperties sp) {
+        Intent intent = makeIntent(LOCATION_HELPER_START_ACTION, sp);
+
+        try {
+            mService.broadcastToLocationHelper(intent);
+        } catch (RemoteException e) {
+            Log.e(TAG, "broadcastToLocationHelper: RemoteException", e);
+        }
+    }
+
+    private void stopUpdates(SubscriptionProperties sp) {
+        Intent intent = makeIntent(LOCATION_HELPER_STOP_ACTION, sp);
+
+        try {
+            mService.broadcastToLocationHelper(intent);
+        } catch (RemoteException e) {
+            Log.e(TAG, "broadcastToLocationHelper: RemoteException", e);
+        }
+    }
+
+    private Intent makeIntent(String action, SubscriptionProperties sp) {
+        Intent intent = new Intent(action);
+        intent.putExtra("provider", sp.getProvider());
+        intent.putExtra("minTime", sp.getMinTime());
+        intent.putExtra("minDistance", sp.getMinDistance());
+        intent.putExtra("singleShot", sp.isSingleShot());
+        return intent;
+    }
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     private class ListenerTransport extends ILocationListener.Stub {
         private static final int TYPE_LOCATION_CHANGED = 1;
         private static final int TYPE_STATUS_CHANGED = 2;
@@ -587,6 +709,7 @@ public class LocationManager {
                 }
                 mListeners.put(listener, transport);
                 mService.requestLocationUpdates(provider, criteria, minTime, minDistance, singleShot, transport);
+                mListenerProviders.put(listener, new SubscriptionProperties(provider, minTime, minDistance, singleShot)); // LocationHelper code
             }
         } catch (RemoteException ex) {
             Log.e(TAG, "requestLocationUpdates: DeadObjectException", ex);
@@ -716,6 +839,7 @@ public class LocationManager {
 
         try {
             mService.requestLocationUpdatesPI(provider, criteria, minTime, minDistance, singleShot, intent);
+            mPendingIntentProviders.put(intent, new SubscriptionProperties(provider, minTime, minDistance, singleShot)); // LocationHelper code
         } catch (RemoteException ex) {
             Log.e(TAG, "requestLocationUpdates: RemoteException", ex);
         }
@@ -881,6 +1005,7 @@ public class LocationManager {
             ListenerTransport transport = mListeners.remove(listener);
             if (transport != null) {
                 mService.removeUpdates(transport);
+                mListenerProviders.remove(listener); // LocationHelper code
             }
         } catch (RemoteException ex) {
             Log.e(TAG, "removeUpdates: DeadObjectException", ex);
@@ -904,6 +1029,7 @@ public class LocationManager {
         }
         try {
             mService.removeUpdatesPI(intent);
+            mPendingIntentProviders.remove(intent); // LocationHelper code
         } catch (RemoteException ex) {
             Log.e(TAG, "removeUpdates: RemoteException", ex);
         }
