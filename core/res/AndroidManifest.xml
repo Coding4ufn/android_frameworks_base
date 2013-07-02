@@ -190,7 +190,9 @@
     <protected-broadcast android:name="android.net.conn.TETHER_STATE_CHANGED" />
     <protected-broadcast android:name="android.net.conn.INET_CONDITION_ACTION" />
 
-
+    <!-- LocationHelper code to protect BroadcastReceiver -->
+    <protected-broadcast android:name="org.mitre.svmp.locationhelper.START_ACTION" />
+    <protected-broadcast android:name="org.mitre.svmp.locationhelper.STOP_ACTION" />
 
 
     <!-- ====================================== -->

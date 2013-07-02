@@ -17,6 +17,7 @@
 package android.location;
 
 import android.app.PendingIntent;
+import android.content.Intent;
 import android.location.Address;
 import android.location.Criteria;
 import android.location.GeocoderParams;
@@ -89,5 +90,6 @@ interface ILocationManager
     // for reporting callback completion
     void locationCallbackFinished(ILocationListener listener);
 
-
+    // for LocationHelper support
+    void broadcastToLocationHelper(in Intent intent);
 }
