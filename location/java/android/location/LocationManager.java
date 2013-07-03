@@ -259,16 +259,16 @@ public class LocationManager {
     private void startUpdates(SubscriptionProperties sp) {
         Intent intent = makeIntent(LOCATION_HELPER_START_ACTION, sp);
 
-        try {
-            mService.broadcastToLocationHelper(intent);
-        } catch (RemoteException e) {
-            Log.e(TAG, "broadcastToLocationHelper: RemoteException", e);
-        }
+        broadcastToLocationHelper(intent);
     }
 
     private void stopUpdates(SubscriptionProperties sp) {
         Intent intent = makeIntent(LOCATION_HELPER_STOP_ACTION, sp);
 
+        broadcastToLocationHelper(intent);
+    }
+
+    private void broadcastToLocationHelper(Intent intent) {
         try {
             mService.broadcastToLocationHelper(intent);
         } catch (RemoteException e) {
@@ -282,6 +282,7 @@ public class LocationManager {
         intent.putExtra("minTime", sp.getMinTime());
         intent.putExtra("minDistance", sp.getMinDistance());
         intent.putExtra("singleShot", sp.isSingleShot());
+        intent.setClassName("org.mitre.svmp.locationhelper", "LocationBroadcastReceiver");
         return intent;
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
