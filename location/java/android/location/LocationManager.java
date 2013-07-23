@@ -282,7 +282,7 @@ public class LocationManager {
         intent.putExtra("minTime", sp.getMinTime());
         intent.putExtra("minDistance", sp.getMinDistance());
         intent.putExtra("singleShot", sp.isSingleShot());
-        intent.setClassName("org.mitre.svmp.locationhelper", "LocationBroadcastReceiver");
+        intent.setClassName("org.mitre.svmp.locationhelper", "org.mitre.svmp.locationhelper.LocationBroadcastReceiver");
         return intent;
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
