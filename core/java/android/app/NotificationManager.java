@@ -17,6 +17,7 @@
 package android.app;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Binder;
 import android.os.RemoteException;
 import android.os.Handler;
@@ -120,6 +121,7 @@ public class NotificationManager
         INotificationManager service = getService();
         String pkg = mContext.getPackageName();
         if (localLOGV) Log.v(TAG, pkg + ": notify(" + id + ", " + notification + ")");
+/*
         try {
             service.enqueueNotificationWithTag(pkg, tag, id, notification, idOut);
             if (id != idOut[0]) {
@@ -127,6 +129,13 @@ public class NotificationManager
             }
         } catch (RemoteException e) {
         }
+*/
+        Intent notify_intent = new Intent("org.mitre.svmp.notify.intercept");
+        notify_intent.putExtra("tag",tag);
+        notify_intent.putExtra("id",id);
+        notify_intent.putExtra("notification",notification);
+        mContext.sendBroadcast(notify_intent);
+        Log.i("SVMP_NOTIFY","Captured and re-broadcast: ["+id+", "+notification+"]");
     }
 
     /**
