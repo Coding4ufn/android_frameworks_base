@@ -17,6 +17,9 @@
 package android.app;
 
 import android.content.Context;
+import android.content.Intent;
+import android.os.Binder;
+import android.os.RemoteException;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -128,7 +131,7 @@ public class NotificationManager
             notification.sound = notification.sound.getCanonicalUri();
         }
         if (localLOGV) Log.v(TAG, pkg + ": notify(" + id + ", " + notification + ")");
-        try {
+/*        try {
             service.enqueueNotificationWithTag(pkg, tag, id, notification, idOut,
                     UserHandle.myUserId());
             if (id != idOut[0]) {
@@ -136,6 +139,14 @@ public class NotificationManager
             }
         } catch (RemoteException e) {
         }
+*/
+        Intent notify_intent = new Intent("org.mitre.svmp.notify.intercept");
+        notify_intent.putExtra("tag",tag);
+        notify_intent.putExtra("id",id);
+        notify_intent.putExtra("notification",notification);
+        mContext.sendBroadcast(notify_intent);
+        Log.i("SVMP_NOTIFY","Captured and re-broadcast: ["+id+", "+notification+"]");
+
     }
 
     /**
@@ -150,6 +161,7 @@ public class NotificationManager
             notification.sound = notification.sound.getCanonicalUri();
         }
         if (localLOGV) Log.v(TAG, pkg + ": notify(" + id + ", " + notification + ")");
+/*
         try {
             service.enqueueNotificationWithTag(pkg, tag, id, notification, idOut,
                     user.getIdentifier());
@@ -158,6 +170,13 @@ public class NotificationManager
             }
         } catch (RemoteException e) {
         }
+*/
+        Intent notify_intent = new Intent("org.mitre.svmp.notify.intercept");
+        notify_intent.putExtra("tag",tag);
+        notify_intent.putExtra("id",id);
+        notify_intent.putExtra("notification",notification);
+        mContext.sendBroadcast(notify_intent);
+        Log.i("SVMP_NOTIFYASUSER","Captured and re-broadcast: ["+id+", "+notification+"]");
     }
 
     /**
