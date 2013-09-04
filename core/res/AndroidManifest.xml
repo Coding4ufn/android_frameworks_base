@@ -192,9 +192,8 @@
 
     <!-- SVMP protected broadcasts -->
     <protected-broadcast android:name="org.mitre.svmp.action.BOOT_COMPLETED" />
-    <!-- LocationHelper code to protect BroadcastReceiver -->
-    <protected-broadcast android:name="org.mitre.svmp.locationhelper.START_ACTION" />
-    <protected-broadcast android:name="org.mitre.svmp.locationhelper.STOP_ACTION" />
+    <protected-broadcast android:name="org.mitre.svmp.action.LOCATION_SUBSCRIBE" />
+    <protected-broadcast android:name="org.mitre.svmp.action.LOCATION_UNSUBSCRIBE" />
     <protected-broadcast android:name="org.mitre.svmp.action.ROTATION_CHANGED" />
 
 

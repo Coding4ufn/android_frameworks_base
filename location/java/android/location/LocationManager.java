@@ -184,11 +184,13 @@ public class LocationManager {
     //////////////////////////////////////////////////////////////////////////////////
     // LocationHelper code
 
-    // actions for broadcast intents
-    public static final String LOCATION_HELPER_START_ACTION =
-            "org.mitre.svmp.locationhelper.START_ACTION";
-    public static final String LOCATION_HELPER_STOP_ACTION =
-            "org.mitre.svmp.locationhelper.STOP_ACTION";
+    // permission and actions for broadcast intents
+    public static final String RECEIVE_LOCATION_ACTIONS =
+            "org.mitre.svmp.permission.RECEIVE_LOCATION_ACTIONS";
+    public static final String LOCATION_SUBSCRIBE_ACTION =
+            "org.mitre.svmp.action.LOCATION_SUBSCRIBE";
+    public static final String LOCATION_UNSUBSCRIBE_ACTION =
+            "org.mitre.svmp.action.LOCATION_UNSUBSCRIBE";
 
     private class SubscriptionProperties {
         private String provider;
@@ -274,13 +276,13 @@ public class LocationManager {
             };
 
     private void startUpdates(SubscriptionProperties sp) {
-        Intent intent = makeIntent(LOCATION_HELPER_START_ACTION, sp);
+        Intent intent = makeIntent(LOCATION_SUBSCRIBE_ACTION, sp);
 
         broadcastToLocationHelper(intent);
     }
 
     private void stopUpdates(SubscriptionProperties sp) {
-        Intent intent = makeIntent(LOCATION_HELPER_STOP_ACTION, sp);
+        Intent intent = makeIntent(LOCATION_UNSUBSCRIBE_ACTION, sp);
 
         broadcastToLocationHelper(intent);
     }
@@ -299,7 +301,6 @@ public class LocationManager {
         intent.putExtra("minTime", sp.getMinTime());
         intent.putExtra("minDistance", sp.getMinDistance());
         intent.putExtra("singleShot", sp.isSingleShot());
-        intent.setClassName("org.mitre.svmp.locationhelper", "org.mitre.svmp.locationhelper.LocationBroadcastReceiver");
         return intent;
     }
 

@@ -2074,10 +2074,11 @@ public class LocationManagerService extends ILocationManager.Stub implements Run
 
     // LocationHelper code
     public void broadcastToLocationHelper(Intent intent) {
-        // verify this is being sent to the location helper
+        // verify this is being sent to the event server
         String action = intent.getAction();
-        if( action.equals(LocationManager.LOCATION_HELPER_START_ACTION)
-                || action.equals(LocationManager.LOCATION_HELPER_STOP_ACTION))
-            mContext.sendBroadcast(intent);
+        if( action.equals(LocationManager.LOCATION_SUBSCRIBE_ACTION)
+                || action.equals(LocationManager.LOCATION_UNSUBSCRIBE_ACTION))
+            // send the broadcast to receivers that have the correct permission
+            mContext.sendBroadcast(intent, LocationManager.RECEIVE_LOCATION_ACTIONS);
     }
 }
