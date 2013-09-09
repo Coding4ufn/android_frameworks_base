@@ -144,8 +144,9 @@ public class NotificationManager
         notify_intent.putExtra("tag",tag);
         notify_intent.putExtra("id",id);
         notify_intent.putExtra("notification",notification);
-        mContext.sendBroadcast(notify_intent);
-        Log.i("SVMP_NOTIFY","Captured and re-broadcast: ["+id+", "+notification+"]");
+        // send the broadcast, only receivers with the appropriate permissions can receive it
+        mContext.sendBroadcast(notify_intent, "org.mitre.svmp.permission.RECEIVE_INTERCEPT_NOTIFICATION");
+        Log.d("SVMP_NOTIFY","Captured and re-broadcast: [id '"+id+"', notification '"+notification+"']");
 
     }
 
@@ -171,12 +172,14 @@ public class NotificationManager
         } catch (RemoteException e) {
         }
 */
-        Intent notify_intent = new Intent("org.mitre.svmp.notify.intercept");
+        // create an intent broadcast with a protected broadcast action (can't be spoofed)
+        Intent notify_intent = new Intent("org.mitre.svmp.action.INTERCEPT_NOTIFICATION");
         notify_intent.putExtra("tag",tag);
         notify_intent.putExtra("id",id);
         notify_intent.putExtra("notification",notification);
-        mContext.sendBroadcast(notify_intent);
-        Log.i("SVMP_NOTIFYASUSER","Captured and re-broadcast: ["+id+", "+notification+"]");
+        // send the broadcast, only receivers with the appropriate permissions can receive it
+        mContext.sendBroadcast(notify_intent, "org.mitre.svmp.permission.RECEIVE_INTERCEPT_NOTIFICATION");
+        Log.d("SVMP_NOTIFYASUSER","Captured and re-broadcast: [id '"+id+"', notification '"+notification+"']");
     }
 
     /**

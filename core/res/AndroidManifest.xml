@@ -195,6 +195,9 @@
     <protected-broadcast android:name="org.mitre.svmp.action.LOCATION_SUBSCRIBE" />
     <protected-broadcast android:name="org.mitre.svmp.action.LOCATION_UNSUBSCRIBE" />
     <protected-broadcast android:name="org.mitre.svmp.action.ROTATION_CHANGED" />
+    <!-- for some reason, protecting the INTERCEPT_NOTIFICATION broadcast causes a crash in NotificationManager... -->
+    <!--<protected-broadcast android:name="org.mitre.svmp.action.INTERCEPT_NOTIFICATION" />-->
+    <protected-broadcast android:name="org.mitre.svmp.action.INTERCEPT_INTENT" />
 
 
     <!-- ====================================== -->
