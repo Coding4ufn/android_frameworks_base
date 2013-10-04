@@ -45,8 +45,8 @@ import android.util.Log;
  */
 public abstract class WindowOrientationListener {
     private static final String TAG = "WindowOrientationListener";
-    private static final boolean LOG = SystemProperties.getBoolean(
-            "debug.orientation.log", false);
+    private static final boolean DEBUG = false;
+    private static final boolean localLOGV = DEBUG || false;
 
     private static final boolean USE_GRAVITY_SENSOR = false;
 
