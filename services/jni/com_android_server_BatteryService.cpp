@@ -87,7 +87,8 @@ static int gVoltageDivisor = 1;
 
 static jint getBatteryStatus(const char* status)
 {
-    switch (status[0]) {
+    return gConstants.statusCharging;
+   /* switch (status[0]) {
         case 'C': return gConstants.statusCharging;         // Charging
         case 'D': return gConstants.statusDischarging;      // Discharging
         case 'F': return gConstants.statusFull;             // Full
@@ -98,12 +99,13 @@ static jint getBatteryStatus(const char* status)
             ALOGW("Unknown battery status '%s'", status);
             return gConstants.statusUnknown;
         }
-    }
+    }*/
 }
 
 static jint getBatteryHealth(const char* status)
 {
-    switch (status[0]) {
+     return gConstants.healthGood;
+     /*switch (status[0]) {
         case 'C': return gConstants.healthCold;         // Cold
         case 'D': return gConstants.healthDead;         // Dead
         case 'G': return gConstants.healthGood;         // Good
@@ -130,7 +132,7 @@ static jint getBatteryHealth(const char* status)
             ALOGW("Unknown battery health[2] '%s'", status);
             return gConstants.healthUnknown;
         }
-    }
+    }*/
 }
 
 static int readFromFile(const char* path, char* buf, size_t size)
@@ -169,6 +171,16 @@ static void setBooleanField(JNIEnv* env, jobject obj, const char* path, jfieldID
     }
     env->SetBooleanField(obj, fieldID, value);
 }
+static void setBooleanField_Charging(JNIEnv* env, jobject obj, const char* path, jfieldID fieldID)
+{
+    env->SetBooleanField(obj, fieldID, true);
+}
+
+static void setIntField_Battery(JNIEnv* env, jobject obj, const char* path, jfieldID fieldID)
+{
+   env->SetIntField(obj, fieldID, 100);
+}
+
 
 static void setIntField(JNIEnv* env, jobject obj, const char* path, jfieldID fieldID)
 {
@@ -198,12 +210,12 @@ static void setVoltageField(JNIEnv* env, jobject obj, const char* path, jfieldID
 
 static void android_server_BatteryService_update(JNIEnv* env, jobject obj)
 {
-    setBooleanField(env, obj, gPaths.acOnlinePath, gFieldIds.mAcOnline);
+    setBooleanField_Charging(env, obj, gPaths.acOnlinePath, gFieldIds.mAcOnline);
     setBooleanField(env, obj, gPaths.usbOnlinePath, gFieldIds.mUsbOnline);
     setBooleanField(env, obj, gPaths.wirelessOnlinePath, gFieldIds.mWirelessOnline);
-    setBooleanField(env, obj, gPaths.batteryPresentPath, gFieldIds.mBatteryPresent);
+    setBooleanField_Charging(env, obj, gPaths.batteryPresentPath, gFieldIds.mBatteryPresent);
     
-    setIntField(env, obj, gPaths.batteryCapacityPath, gFieldIds.mBatteryLevel);
+    setIntField_Battery(env, obj, gPaths.batteryCapacityPath, gFieldIds.mBatteryLevel);
     setVoltageField(env, obj, gPaths.batteryVoltagePath, gFieldIds.mBatteryVoltage);
     setIntField(env, obj, gPaths.batteryTemperaturePath, gFieldIds.mBatteryTemperature);
     
