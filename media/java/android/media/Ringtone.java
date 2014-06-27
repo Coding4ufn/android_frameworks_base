@@ -18,11 +18,12 @@ package android.media;
 
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.Resources.NotFoundException;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.RemoteException;
-import android.provider.DrmStore;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.util.Log;
@@ -46,12 +47,6 @@ public class Ringtone {
         MediaStore.Audio.Media._ID,
         MediaStore.Audio.Media.DATA,
         MediaStore.Audio.Media.TITLE
-    };
-
-    private static final String[] DRM_COLUMNS = new String[] {
-        DrmStore.Audio._ID,
-        DrmStore.Audio.DATA,
-        DrmStore.Audio.TITLE
     };
 
     private final Context mContext;
@@ -99,8 +94,8 @@ public class Ringtone {
     }
 
     /**
-     * Returns a human-presentable title for ringtone. Looks in media and DRM
-     * content providers. If not in either, uses the filename
+     * Returns a human-presentable title for ringtone. Looks in media
+     * content provider. If not in either, uses the filename
      * 
      * @param context A context used for querying. 
      */
@@ -129,9 +124,7 @@ public class Ringtone {
                 }
             } else {
                 try {
-                    if (DrmStore.AUTHORITY.equals(authority)) {
-                        cursor = res.query(uri, DRM_COLUMNS, null, null, null);
-                    } else if (MediaStore.AUTHORITY.equals(authority)) {
+                    if (MediaStore.AUTHORITY.equals(authority)) {
                         cursor = res.query(uri, MEDIA_COLUMNS, null, null, null);
                     }
                 } catch (SecurityException e) {
@@ -229,10 +222,14 @@ public class Ringtone {
             try {
                 mRemotePlayer.play(mRemoteToken, canonicalUri, mStreamType);
             } catch (RemoteException e) {
-                Log.w(TAG, "Problem playing ringtone: " + e);
+                if (!playFallbackRingtone()) {
+                    Log.w(TAG, "Problem playing ringtone: " + e);
+                }
             }
         } else {
-            Log.w(TAG, "Neither local nor remote playback available");
+            if (!playFallbackRingtone()) {
+                Log.w(TAG, "Neither local nor remote playback available");
+            }
         }
     }
 
@@ -278,6 +275,45 @@ public class Ringtone {
             Log.w(TAG, "Neither local nor remote playback available");
             return false;
         }
+    }
+
+    private boolean playFallbackRingtone() {
+        if (mAudioManager.getStreamVolume(mStreamType) != 0) {
+            int ringtoneType = RingtoneManager.getDefaultType(mUri);
+            if (ringtoneType == -1 ||
+                    RingtoneManager.getActualDefaultRingtoneUri(mContext, ringtoneType) != null) {
+                // Default ringtone, try fallback ringtone.
+                try {
+                    AssetFileDescriptor afd = mContext.getResources().openRawResourceFd(
+                            com.android.internal.R.raw.fallbackring);
+                    if (afd != null) {
+                        mLocalPlayer = new MediaPlayer();
+                        if (afd.getDeclaredLength() < 0) {
+                            mLocalPlayer.setDataSource(afd.getFileDescriptor());
+                        } else {
+                            mLocalPlayer.setDataSource(afd.getFileDescriptor(),
+                                    afd.getStartOffset(),
+                                    afd.getDeclaredLength());
+                        }
+                        mLocalPlayer.setAudioStreamType(mStreamType);
+                        mLocalPlayer.prepare();
+                        mLocalPlayer.start();
+                        afd.close();
+                        return true;
+                    } else {
+                        Log.e(TAG, "Could not load fallback ringtone");
+                    }
+                } catch (IOException ioe) {
+                    destroyLocalPlayer();
+                    Log.e(TAG, "Failed to open fallback ringtone");
+                } catch (NotFoundException nfe) {
+                    Log.e(TAG, "Fallback ringtone does not exist");
+                }
+            } else {
+                Log.w(TAG, "not playing fallback for " + mUri);
+            }
+        }
+        return false;
     }
 
     void setTitle(String title) {

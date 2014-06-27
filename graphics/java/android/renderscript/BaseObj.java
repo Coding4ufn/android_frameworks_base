@@ -16,12 +16,12 @@
 
 package android.renderscript;
 
-import android.util.Log;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * BaseObj is the base class for interfacing with native renderscript objects.
- * It primarly contains code for tracking the native object ID and forcably
- * disconecting the object from the native allocation for early cleanup.
+ * BaseObj is the base class for all RenderScript objects owned by a RS context.
+ * It is responsible for lifetime management and resource tracking. This class
+ * should not be used by a user application.
  *
  **/
 public class BaseObj {
@@ -75,8 +75,7 @@ public class BaseObj {
 
     /**
      * setName assigns a name to an object.  This object can later be looked up
-     * by this name.  This name will also be retained if the object is written
-     * to an A3D file.
+     * by this name.
      *
      * @param name The name to assign to the object.
      */
@@ -110,32 +109,44 @@ public class BaseObj {
         return mName;
     }
 
-    protected void finalize() throws Throwable {
-        if (!mDestroyed) {
-            if(mID != 0 && mRS.isAlive()) {
+    private void helpDestroy() {
+        boolean shouldDestroy = false;
+        synchronized(this) {
+            if (!mDestroyed) {
+                shouldDestroy = true;
+                mDestroyed = true;
+            }
+        }
+
+        if (shouldDestroy) {
+            // must include nObjDestroy in the critical section
+            ReentrantReadWriteLock.ReadLock rlock = mRS.mRWLock.readLock();
+            rlock.lock();
+            // AllocationAdapters are BaseObjs with an ID of 0 but should not be passed to nObjDestroy
+            if(mRS.isAlive() && mID != 0) {
                 mRS.nObjDestroy(mID);
             }
+            rlock.unlock();
             mRS = null;
             mID = 0;
-            mDestroyed = true;
-            //Log.v(RenderScript.LOG_TAG, getClass() +
-            // " auto finalizing object without having released the RS reference.");
         }
+    }
+
+    protected void finalize() throws Throwable {
+        helpDestroy();
         super.finalize();
     }
 
     /**
-     * destroy disconnects the object from the native object effectively
-     * rendering this java object dead.  The primary use is to force immediate
-     * cleanup of resources when it is believed the GC will not respond quickly
-     * enough.
+     * Frees any native resources associated with this object.  The
+     * primary use is to force immediate cleanup of resources when it is
+     * believed the GC will not respond quickly enough.
      */
-    synchronized public void destroy() {
+    public void destroy() {
         if(mDestroyed) {
             throw new RSInvalidStateException("Object already destroyed.");
         }
-        mDestroyed = true;
-        mRS.nObjDestroy(mID);
+        helpDestroy();
     }
 
     /**

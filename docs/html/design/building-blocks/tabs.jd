@@ -1,7 +1,15 @@
 page.title=Tabs
+page.tags="tabs","actionbar","navigation","viewpager"
 @jd:body
 
 <img src="{@docRoot}design/media/tabs_overview.png">
+
+<a class="notice-developers" href="{@docRoot}training/implementing-navigation/lateral.html">
+  <div>
+    <h3>Developer Docs</h3>
+    <p>Creating Swipe Views with Tabs</p>
+  </div>
+</a>
 
 <p>Tabs in the action bar make it easy to explore and switch between different views or functional
 aspects of your app, or to browse categorized data sets.</p>
@@ -27,7 +35,7 @@ to the next/previous view, swipe left or right.</p>
     </video>
     <div class="figure-caption">
       Scrolling tabs in the Play Store app.
-      <div class="video-instructions">&nbsp;</div>
+      <div class="video-instructions-image">&nbsp;</div>
     </div>
 
   </div>
@@ -45,22 +53,5 @@ to the next/previous view, swipe left or right.</p>
 
 <img src="{@docRoot}design/media/tabs_youtube.png">
 <div class="figure-caption">
-  Tabs in the YouTube app.
-</div>
-
-
-
-<h2 id="stacked">Stacked Tabs</h2>
-
-
-<p>If view navigation is essential to your app, you can break out tabs into a separate action bar. This
-permits fast view switching even on narrower screens.</p>
-
-<img src="{@docRoot}design/media/tabs_stacked.png">
-
-
-<div class="note develop">
-<p><strong>Developer Guide</strong></p>
-  <p>For information about how to create tabs,
-  see the <a href="{@docRoot}guide/topics/ui/actionbar.html">Action Bar</a> API guide.</p>
+  Tabs in the Google Play Movies app.
 </div>

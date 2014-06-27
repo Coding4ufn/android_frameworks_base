@@ -24,6 +24,7 @@
     android:id="@+id/recents_root"
     android:layout_height="match_parent"
     android:layout_width="match_parent"
+    android:foreground="@drawable/bg_protect"
     systemui:recentItemLayout="@layout/status_bar_recent_item"
     >
     <FrameLayout
@@ -46,7 +47,10 @@
             <LinearLayout android:id="@+id/recents_linear_layout"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:orientation="horizontal">
+                android:layoutDirection="ltr"
+                android:layout_gravity="left"
+                android:orientation="horizontal"
+                android:fitsSystemWindows="true">
             </LinearLayout>
 
         </com.android.systemui.recent.RecentsHorizontalScrollView>

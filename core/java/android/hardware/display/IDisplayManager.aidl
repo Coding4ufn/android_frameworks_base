@@ -20,6 +20,7 @@ import android.hardware.display.IDisplayManagerCallback;
 import android.hardware.display.WifiDisplay;
 import android.hardware.display.WifiDisplayStatus;
 import android.view.DisplayInfo;
+import android.view.Surface;
 
 /** @hide */
 interface IDisplayManager {
@@ -28,11 +29,14 @@ interface IDisplayManager {
 
     void registerCallback(in IDisplayManagerCallback callback);
 
-    // No permissions required.
-    void scanWifiDisplays();
+    // Requires CONFIGURE_WIFI_DISPLAY permission.
+    // The process must have previously registered a callback.
+    void startWifiDisplayScan();
 
-    // Requires CONFIGURE_WIFI_DISPLAY permission to connect to an unknown device.
-    // No permissions required to connect to a known device.
+    // Requires CONFIGURE_WIFI_DISPLAY permission.
+    void stopWifiDisplayScan();
+
+    // Requires CONFIGURE_WIFI_DISPLAY permission.
     void connectWifiDisplay(String address);
 
     // No permissions required.
@@ -44,6 +48,20 @@ interface IDisplayManager {
     // Requires CONFIGURE_WIFI_DISPLAY permission.
     void forgetWifiDisplay(String address);
 
+    // Requires CONFIGURE_WIFI_DISPLAY permission.
+    void pauseWifiDisplay();
+
+    // Requires CONFIGURE_WIFI_DISPLAY permission.
+    void resumeWifiDisplay();
+
     // No permissions required.
     WifiDisplayStatus getWifiDisplayStatus();
+
+    // Requires CAPTURE_VIDEO_OUTPUT or CAPTURE_SECURE_VIDEO_OUTPUT for certain
+    // combinations of flags.
+    int createVirtualDisplay(IBinder token, String packageName,
+            String name, int width, int height, int densityDpi, in Surface surface, int flags);
+
+    // No permissions required but must be same Uid as the creator.
+    void releaseVirtualDisplay(in IBinder token);
 }

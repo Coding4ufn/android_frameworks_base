@@ -63,6 +63,9 @@
           <li><a href="<?cs var:toroot ?>guide/topics/providers/contacts-provider.html">
               <span class="en">Contacts Provider</span>
             </a></li>
+          <li><a href="<?cs var:toroot ?>guide/topics/providers/document-provider.html">
+              <span class="en">Storage Access Framework</span>
+            </a></li>
         </ul>
       </li>
       <li><a href="<?cs var:toroot ?>guide/components/intents-filters.html">
@@ -76,9 +79,16 @@
           <span class="en">Permissions</span>
         </a>
       </li>
-      <li><a href="<?cs var:toroot ?>guide/topics/appwidgets/index.html">
+      <li class="nav-section">
+        <div class="nav-section-header"><a href="<?cs var:toroot ?>guide/topics/appwidgets/index.html">
             <span class="en">App Widgets</span>
-          </a></li>
+          </a></div>
+        <ul>
+          <li><a href="<?cs var:toroot ?>guide/topics/appwidgets/host.html">
+              <span class="en">App Widget Host</span>
+            </a></li>
+        </ul>
+      </li>
       <li class="nav-section">
       <div class="nav-section-header"><a href="<?cs var:toroot ?>guide/topics/manifest/manifest-intro.html">
           <span class="en">Android Manifest</span>
@@ -138,9 +148,6 @@
        <!--
           <li><a href="<?cs var:toroot ?>guide/topics/ui/layout/grid.html">
               <span class="en">Grid Layout</span>
-            </a></li>
-          <li><a href="<?cs var:toroot ?>guide/topics/ui/layout/tabs.html">
-              <span class="en">Tab Layout</span>
             </a></li>
        -->
           <li><a href="<?cs var:toroot ?>guide/topics/ui/layout/listview.html">
@@ -305,7 +312,7 @@
             <span class="en">Canvas and Drawables</span>
           </a></li>
         <li><a href="<?cs var:toroot ?>guide/topics/graphics/opengl.html">
-            <span class="en">OpenGL</span>
+            <span class="en">OpenGL ES</span>
           </a></li>
         <li><a href="<?cs var:toroot ?>guide/topics/graphics/hardware-accel.html">
             <span class="en">Hardware Acceleration</span>
@@ -319,11 +326,11 @@
             </a></div>
             <ul>
               <li><a href="<?cs var:toroot ?>guide/topics/renderscript/compute.html">
-                    <span class="en">Renderscript</span></a>
+                    <span class="en">RenderScript</span></a>
                   </li>
 
               <li><a href="<?cs var:toroot ?>guide/topics/renderscript/advanced.html">
-                    <span class="en">Advanced Renderscript</span></a>
+                    <span class="en">Advanced RenderScript</span></a>
                   </li>
               <li><a href="<?cs var:toroot ?>guide/topics/renderscript/reference.html">
                     <span class="en">Runtime API Reference</span></a>
@@ -381,15 +388,19 @@
 
 
 
-      <li class="nav-section">
+<li class="nav-section">
         <div class="nav-section-header"><a href="<?cs var:toroot ?>guide/topics/connectivity/index.html">
                <span class="en">Connectivity</span>
              </a></div>
         <ul>
-          <li><a href="<?cs var:toroot?>guide/topics/connectivity/bluetooth.html">
-              <span class="en">Bluetooth</span>
-            </a>
-          </li>
+          <li class="nav-section">
+        <div class="nav-section-header"><a href="<?cs var:toroot?>guide/topics/connectivity/bluetooth.html">
+          <span class="en">Bluetooth</span></a>
+        </div>
+        <ul>
+          <li><a href="<?cs var:toroot ?>guide/topics/connectivity/bluetooth-le.html">Bluetooth Low Energy</a></li>
+        </ul>
+      </li>
       <li class="nav-section">
         <div class="nav-section-header"><a href="<?cs var:toroot?>guide/topics/connectivity/nfc/index.html">
           <span class="en">NFC</span></a>
@@ -397,10 +408,11 @@
         <ul>
           <li><a href="<?cs var:toroot ?>guide/topics/connectivity/nfc/nfc.html">NFC Basics</a></li>
           <li><a href="<?cs var:toroot ?>guide/topics/connectivity/nfc/advanced-nfc.html">Advanced NFC</a></li>
+          <li><a href="<?cs var:toroot ?>guide/topics/connectivity/nfc/hce.html">Host-based Card Emulation</a></li>
         </ul>
       </li>
       <li><a href="<?cs var:toroot?>guide/topics/connectivity/wifip2p.html">
-            <span class="en">Wi-Fi Direct</span></a>
+            <span class="en">Wi-Fi P2P</span></a>
           </li>
       <li class="nav-section">
           <div class="nav-section-header"><a href="<?cs var:toroot?>guide/topics/connectivity/usb/index.html">
@@ -418,6 +430,7 @@
 
     </ul>
   </li><!-- end of connectivity -->
+
 
       <li class="nav-section">
         <div class="nav-section-header"><a href="<?cs var:toroot ?>guide/topics/text/index.html">
@@ -486,6 +499,9 @@
       <li><a href="<?cs var:toroot ?>guide/webapps/webview.html">
             <span class="en">Building Web Apps in WebView</span>
           </a></li>
+      <li><a href="<?cs var:toroot ?>guide/webapps/migrating.html">
+            <span class="en">Migrating to WebView in Android 4.4</span>
+          </a></li>
       <li><a href="<?cs var:toroot ?>guide/webapps/debugging.html">
             <span class="en">Debugging Web Apps</span>
           </a></li>
@@ -503,8 +519,8 @@
       <span class="fr" style="display:none">Meilleures pratiques</span>
       <span class="it" style="display:none">Best practice</span>
       <span class="ja" style="display:none">ベスト プラクティス</span>
-      <span class="zh-CN" style="display:none">最佳实践</span>
-      <span class="zh-TW" style="display:none">最佳實務</span>
+      <span class="zh-cn" style="display:none">最佳实践</span>
+      <span class="zh-tw" style="display:none">最佳實務</span>
     </div></a>
     <ul>
       <li><a href="<?cs var:toroot ?>guide/practices/compatibility.html">
@@ -521,9 +537,6 @@
           <li><a href="<?cs var:toroot ?>guide/practices/screen-compat-mode.html">
             <span class="en">Screen Compatibility Mode</span>
           </a></li>
-          <!--<li><a href="<?cs var:toroot ?>guide/practices/screens-support-1.5.html">
-            <span class="en">Strategies for Android 1.5</span>
-          </a></li> -->
         </ul>
       </li>
       <li><a href="<?cs var:toroot ?>guide/practices/tablets-and-handsets.html">
@@ -584,8 +597,8 @@
         <span class="fr" style="display:none">Annexes</span>
         <span class="it" style="display:none">Appendice</span>
         <span class="ja" style="display:none">付録</span>
-        <span class="zh-CN" style="display:none">附录</span>
-        <span class="zh-TW" style="display:none">附錄</span>
+        <span class="zh-cn" style="display:none">附录</span>
+        <span class="zh-tw" style="display:none">附錄</span>
       </a></div>
     <ul>
       <li><a href="<?cs var:toroot ?>guide/appendix/g-app-intents.html">

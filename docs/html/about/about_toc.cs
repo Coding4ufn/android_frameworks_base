@@ -7,9 +7,17 @@
     </ul>
   </li> 
   <li class="nav-section">
+    <div class="nav-section-header"><a href="<?cs var:toroot ?>about/versions/kitkat.html">
+      <span class="en">KitKat</span></a></div>
+      <ul>
+        <li><a href="<?cs var:toroot ?>about/versions/android-4.4.html">Android 4.4 APIs</a></li>
+      </ul>
+  </li>
+  <li class="nav-section">
     <div class="nav-section-header"><a href="<?cs var:toroot ?>about/versions/jelly-bean.html">
       <span class="en">Jelly Bean</span></a></div>
       <ul>
+        <li><a href="<?cs var:toroot ?>about/versions/android-4.3.html">Android 4.3 APIs</a></li>
         <li><a href="<?cs var:toroot ?>about/versions/android-4.2.html">Android 4.2 APIs</a></li>
         <li><a href="<?cs var:toroot ?>about/versions/android-4.1.html">Android 4.1 APIs</a></li>
       </ul>

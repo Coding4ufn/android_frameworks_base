@@ -1,6 +1,13 @@
 page.title=Notifications
 @jd:body
 
+<a class="notice-developers" href="{@docRoot}training/notify-user/index.html">
+  <div>
+    <h3>Developer Docs</h3>
+    <p>Notifying the User</p>
+  </div>
+</a>
+
 <p>The notification system allows your app to keep the user informed about events, such as new chat messages or a calendar event. Think of notifications as a news channel that alerts the user to important events as they happen or a log that chronicles events while the user is not paying attention.</p>
 
 <h4>New in Jelly Bean</h4>
@@ -226,26 +233,13 @@ develop a widget that they can choose to place on their home screen.</p>
 <div class="layout-content-row">
   <div class="layout-content-col span-6">
 
-<p>On tablets, the notification area is integrated with the system bar at the bottom of the screen. The notification drawer is opened by touching anywhere inside the notification area.</p>
+<p><h4>Ongoing notifications</h4>
+<p>Ongoing notifications keep users informed about an ongoing process in the background. For example, music players announce the currently playing track in the notification system and continue to do so until the user stops the playback. They can also be used to show the user feedback for longer tasks like downloading a file, or encoding a video. Ongoing notifications cannot be manually removed from the notification drawer.</p></p>
 
   </div>
-  <div class="layout-content-col span-6">
-
-    <img src="{@docRoot}design/media/notifications_pattern_tablet.png">
-
-  </div>
-</div>
-
-<div class="layout-content-row">
   <div class="layout-content-col span-6">
 
     <img src="{@docRoot}design/media/notifications_pattern_ongoing_music.png">
-
-  </div>
-  <div class="layout-content-col span-6">
-
-<h4>Ongoing notifications</h4>
-<p>Ongoing notifications keep users informed about an ongoing process in the background. For example, music players announce the currently playing track in the notification system and continue to do so until the user stops the playback. They can also be used to show the user feedback for longer tasks like downloading a file, or encoding a video. Ongoing notifications cannot be manually removed from the notification drawer.</p>
 
   </div>
 </div>
@@ -257,11 +251,3 @@ develop a widget that they can choose to place on their home screen.</p>
   </div>
 </div>
 
-
-
-<div class="note develop">
-<p><strong>Developer Guide</strong></p>
-  <p>For information about how to build notifications, see the
-  <a href="{@docRoot}guide/topics/ui/notifiers/notifications.html">Notifications</a>
-  API guide.</p>
-</div>

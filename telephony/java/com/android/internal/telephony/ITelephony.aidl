@@ -17,9 +17,12 @@
 package com.android.internal.telephony;
 
 import android.os.Bundle;
-import java.util.List;
-import android.telephony.NeighboringCellInfo;
 import android.telephony.CellInfo;
+import android.telephony.NeighboringCellInfo;
+
+import com.android.internal.telephony.ITelephonyListener;
+
+import java.util.List;
 
 /**
  * Interface used to interact with the phone.  Mostly this is used by the
@@ -42,7 +45,7 @@ interface ITelephony {
      * Place a call to the specified number.
      * @param number the number to be called.
      */
-    void call(String number);
+    void call(String callingPackage, String number);
 
     /**
      * If there is currently a call in progress, show the call screen.
@@ -155,6 +158,26 @@ interface ITelephony {
     boolean supplyPuk(String puk, String pin);
 
     /**
+     * Supply a pin to unlock the SIM.  Blocks until a result is determined.
+     * Returns a specific success/error code.
+     * @param pin The pin to check.
+     * @return retValue[0] = Phone.PIN_RESULT_SUCCESS on success. Otherwise error code
+     *         retValue[1] = number of attempts remaining if known otherwise -1
+     */
+    int[] supplyPinReportResult(String pin);
+
+    /**
+     * Supply puk to unlock the SIM and set SIM pin to new pin.
+     * Blocks until a result is determined.
+     * Returns a specific success/error code
+     * @param puk The puk to check
+     *        pin The pin to check.
+     * @return retValue[0] = Phone.PIN_RESULT_SUCCESS on success. Otherwise error code
+     *         retValue[1] = number of attempts remaining if known otherwise -1
+     */
+    int[] supplyPukReportResult(String puk, String pin);
+
+    /**
      * Handles PIN MMI commands (PIN/PIN2/PUK/PUK2), which are initiated
      * without SEND (so <code>dial</code> is not appropriate).
      *
@@ -172,6 +195,11 @@ interface ITelephony {
      * Set the radio to on or off
      */
     boolean setRadio(boolean turnOn);
+
+    /**
+     * Set the radio to on or off unconditionally
+     */
+    boolean setRadioPower(boolean turnOn);
 
     /**
      * Request to update location information in service state
@@ -218,7 +246,7 @@ interface ITelephony {
     /**
      * Returns the neighboring cell information of the device.
      */
-    List<NeighboringCellInfo> getNeighboringCellInfo();
+    List<NeighboringCellInfo> getNeighboringCellInfo(String callingPkg);
 
      int getCallState();
      int getDataActivity();
@@ -261,9 +289,19 @@ interface ITelephony {
     int getVoiceMessageCount();
 
     /**
-      * Returns the network type
+      * Returns the network type for data transmission
       */
     int getNetworkType();
+
+    /**
+      * Returns the network type for data transmission
+      */
+    int getDataNetworkType();
+
+    /**
+      * Returns the network type for voice
+      */
+    int getVoiceNetworkType();
 
     /**
      * Return true if an ICC card is present
@@ -284,5 +322,53 @@ interface ITelephony {
      * Returns the all observed cell information of the device.
      */
     List<CellInfo> getAllCellInfo();
+
+    /**
+     * Sets minimum time in milli-seconds between onCellInfoChanged
+     */
+    void setCellInfoListRate(int rateInMillis);
+
+    /**
+     * Put a call on hold.
+     */
+     void toggleHold();
+
+     /**
+      * Merge foreground and background calls.
+      */
+     void merge();
+
+     /**
+      * Swap foreground and background calls.
+      */
+     void swap();
+
+     /**
+      * Mute the phone.
+      */
+     void mute(boolean mute);
+
+    /**
+     * Start playing DTMF tone for the specified digit.
+     *
+     * @param digit the digit that corresponds with the desired tone.
+     * @param timedShortcode whether the specified digit should be played as a timed short code.
+     */
+     void playDtmfTone(char digit, boolean timedShortCode);
+
+     /**
+      * Stop playing DTMF tones.
+      */
+     void stopDtmfTone();
+
+     /**
+       * Register a callback.
+       */
+      void addListener(ITelephonyListener listener);
+
+      /**
+       * Unregister a callback.
+       */
+      void removeListener(ITelephonyListener listener);
 }
 

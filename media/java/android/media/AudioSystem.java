@@ -111,6 +111,14 @@ public class AudioSystem
     public static native boolean isStreamActive(int stream, int inPastMs);
 
     /*
+     * Checks whether the specified stream type is active on a remotely connected device. The notion
+     * of what constitutes a remote device is enforced by the audio policy manager of the platform.
+     *
+     * return true if any track playing on this stream is active on a remote device.
+     */
+    public static native boolean isStreamActiveRemotely(int stream, int inPastMs);
+
+    /*
      * Checks whether the specified audio source is active.
      *
      * return true if any recorder using this source is currently recording
@@ -169,12 +177,10 @@ public class AudioSystem
     {
         synchronized (AudioSystem.class) {
             mErrorCallback = cb;
+            if (cb != null) {
+                cb.onError(checkAudioFlinger());
+            }
         }
-        // Calling a method on AudioFlinger here makes sure that we bind to IAudioFlinger
-        // binder interface death. Not doing that would result in not being notified of
-        // media_server process death if no other method is called on AudioSystem that reaches
-        // to AudioFlinger.
-        isMicrophoneMuted();
     }
 
     private static void errorCallbackFromNative(int error)
@@ -393,5 +399,8 @@ public class AudioSystem
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning
     public static native int getPrimaryOutputSamplingRate();
     public static native int getPrimaryOutputFrameCount();
+    public static native int getOutputLatency(int stream);
 
+    public static native int setLowRamDevice(boolean isLowRamDevice);
+    public static native int checkAudioFlinger();
 }

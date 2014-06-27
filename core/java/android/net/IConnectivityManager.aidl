@@ -16,13 +16,16 @@
 
 package android.net;
 
+import android.net.LinkQualityInfo;
 import android.net.LinkProperties;
 import android.net.NetworkInfo;
 import android.net.NetworkQuotaInfo;
 import android.net.NetworkState;
 import android.net.ProxyProperties;
 import android.os.IBinder;
+import android.os.Messenger;
 import android.os.ParcelFileDescriptor;
+import android.os.ResultReceiver;
 
 import com.android.internal.net.LegacyVpnInfo;
 import com.android.internal.net.VpnConfig;
@@ -35,6 +38,9 @@ import com.android.internal.net.VpnProfile;
 /** {@hide} */
 interface IConnectivityManager
 {
+    // Keep this in sync with framework/native/services/connectivitymanager/ConnectivityManager.h
+    void markSocketAsUser(in ParcelFileDescriptor socket, int uid);
+
     void setNetworkPreference(int pref);
 
     int getNetworkPreference();
@@ -43,6 +49,8 @@ interface IConnectivityManager
     NetworkInfo getActiveNetworkInfoForUid(int uid);
     NetworkInfo getNetworkInfo(int networkType);
     NetworkInfo[] getAllNetworkInfo();
+
+    NetworkInfo getProvisioningOrActiveNetworkInfo();
 
     boolean isNetworkSupported(int networkType);
 
@@ -63,9 +71,9 @@ interface IConnectivityManager
 
     int stopUsingNetworkFeature(int networkType, in String feature);
 
-    boolean requestRouteToHost(int networkType, int hostAddress);
+    boolean requestRouteToHost(int networkType, int hostAddress, String packageName);
 
-    boolean requestRouteToHostAddress(int networkType, in byte[] hostAddress);
+    boolean requestRouteToHostAddress(int networkType, in byte[] hostAddress, String packageName);
 
     boolean getMobileDataEnabled();
     void setMobileDataEnabled(boolean enabled);
@@ -84,12 +92,6 @@ interface IConnectivityManager
     String[] getTetherableIfaces();
 
     String[] getTetheredIfaces();
-
-    /**
-     * Return list of interface pairs that are actively tethered.  Even indexes are
-     * remote interface, and odd indexes are corresponding local interfaces.
-     */
-    String[] getTetheredIfacePairs();
 
     String[] getTetheringErroredIfaces();
 
@@ -119,6 +121,8 @@ interface IConnectivityManager
 
     ParcelFileDescriptor establishVpn(in VpnConfig config);
 
+    VpnConfig getVpnConfig();
+
     void startLegacyVpn(in VpnProfile profile);
 
     LegacyVpnInfo getLegacyVpnInfo();
@@ -126,4 +130,26 @@ interface IConnectivityManager
     boolean updateLockdownVpn();
 
     void captivePortalCheckComplete(in NetworkInfo info);
+
+    void captivePortalCheckCompleted(in NetworkInfo info, boolean isCaptivePortal);
+
+    void supplyMessenger(int networkType, in Messenger messenger);
+
+    int findConnectionTypeForIface(in String iface);
+
+    int checkMobileProvisioning(int suggestedTimeOutMs);
+
+    String getMobileProvisioningUrl();
+
+    String getMobileRedirectedProvisioningUrl();
+
+    LinkQualityInfo getLinkQualityInfo(int networkType);
+
+    LinkQualityInfo getActiveLinkQualityInfo();
+
+    LinkQualityInfo[] getAllLinkQualityInfo();
+
+    void setProvisioningNotificationVisible(boolean visible, int networkType, in String extraInfo, in String url);
+
+    void setAirplaneMode(boolean enable);
 }

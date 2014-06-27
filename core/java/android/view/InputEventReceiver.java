@@ -23,6 +23,8 @@ import android.os.MessageQueue;
 import android.util.Log;
 import android.util.SparseIntArray;
 
+import java.lang.ref.WeakReference;
+
 /**
  * Provides a low-level mechanism for an application to receive input events.
  * @hide
@@ -42,11 +44,11 @@ public abstract class InputEventReceiver {
     // Map from InputEvent sequence numbers to dispatcher sequence numbers.
     private final SparseIntArray mSeqMap = new SparseIntArray();
 
-    private static native int nativeInit(InputEventReceiver receiver,
+    private static native int nativeInit(WeakReference<InputEventReceiver> receiver,
             InputChannel inputChannel, MessageQueue messageQueue);
     private static native void nativeDispose(int receiverPtr);
     private static native void nativeFinishInputEvent(int receiverPtr, int seq, boolean handled);
-    private static native void nativeConsumeBatchedInputEvents(int receiverPtr,
+    private static native boolean nativeConsumeBatchedInputEvents(int receiverPtr,
             long frameTimeNanos);
 
     /**
@@ -65,7 +67,8 @@ public abstract class InputEventReceiver {
 
         mInputChannel = inputChannel;
         mMessageQueue = looper.getQueue();
-        mReceiverPtr = nativeInit(this, inputChannel, mMessageQueue);
+        mReceiverPtr = nativeInit(new WeakReference<InputEventReceiver>(this),
+                inputChannel, mMessageQueue);
 
         mCloseGuard.open("dispose");
     }
@@ -162,14 +165,17 @@ public abstract class InputEventReceiver {
      *
      * @param frameTimeNanos The time in the {@link System#nanoTime()} time base
      * when the current display frame started rendering, or -1 if unknown.
+     *
+     * @return Whether a batch was consumed
      */
-    public final void consumeBatchedInputEvents(long frameTimeNanos) {
+    public final boolean consumeBatchedInputEvents(long frameTimeNanos) {
         if (mReceiverPtr == 0) {
             Log.w(TAG, "Attempted to consume batched input events but the input event "
                     + "receiver has already been disposed.");
         } else {
-            nativeConsumeBatchedInputEvents(mReceiverPtr, frameTimeNanos);
+            return nativeConsumeBatchedInputEvents(mReceiverPtr, frameTimeNanos);
         }
+        return false;
     }
 
     // Called from native code.

@@ -17,6 +17,8 @@
 package android.graphics.drawable;
 
 import android.graphics.Insets;
+import android.graphics.Xfermode;
+import android.os.Trace;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -146,6 +148,10 @@ public abstract class Drawable {
 
         if (oldBounds.left != left || oldBounds.top != top ||
                 oldBounds.right != right || oldBounds.bottom != bottom) {
+            if (!oldBounds.isEmpty()) {
+                // first invalidate the previous bounds
+                invalidateSelf();
+            }
             mBounds.set(left, top, right, bottom);
             onBoundsChange(mBounds);
         }
@@ -406,10 +412,30 @@ public abstract class Drawable {
     public abstract void setAlpha(int alpha);
 
     /**
+     * Gets the current alpha value for the drawable. 0 means fully transparent,
+     * 255 means fully opaque. This method is implemented by
+     * Drawable subclasses and the value returned is specific to how that class treats alpha.
+     * The default return value is 255 if the class does not override this method to return a value
+     * specific to its use of alpha.
+     */
+    public int getAlpha() {
+        return 0xFF;
+    }
+
+    /**
      * Specify an optional colorFilter for the drawable. Pass null to remove
      * any filters.
     */
     public abstract void setColorFilter(ColorFilter cf);
+
+    /**
+     * @hide Consider for future API inclusion
+     */
+    public void setXfermode(Xfermode mode) {
+        // Base implementation drops it on the floor for compatibility. Whee!
+        // TODO: For this to be included in the API proper, all framework drawables need impls.
+        // For right now only BitmapDrawable has it.
+    }
 
     /**
      * Specify a color and porterduff mode to be the colorfilter for this
@@ -553,6 +579,25 @@ public abstract class Drawable {
 
     public final boolean isVisible() {
         return mVisible;
+    }
+
+    /**
+     * Set whether this Drawable is automatically mirrored when its layout direction is RTL
+     * (right-to left). See {@link android.util.LayoutDirection}.
+     *
+     * @param mirrored Set to true if the Drawable should be mirrored, false if not.
+     */
+    public void setAutoMirrored(boolean mirrored) {
+    }
+
+    /**
+     * Tells if this Drawable will be automatically mirrored  when its layout direction is RTL
+     * right-to-left. See {@link android.util.LayoutDirection}.
+     *
+     * @return boolean Returns true if this Drawable will be automatically mirrored.
+     */
+    public boolean isAutoMirrored() {
+        return false;
     }
 
     /**
@@ -715,7 +760,7 @@ public abstract class Drawable {
      *
      * @hide
      */
-    public Insets getLayoutInsets() {
+    public Insets getOpticalInsets() {
         return Insets.NONE;
     }
 
@@ -741,7 +786,12 @@ public abstract class Drawable {
      * Create a drawable from an inputstream
      */
     public static Drawable createFromStream(InputStream is, String srcName) {
-        return createFromResourceStream(null, null, is, srcName, null);
+        Trace.traceBegin(Trace.TRACE_TAG_RESOURCES, srcName != null ? srcName : "Unknown drawable");
+        try {
+            return createFromResourceStream(null, null, is, srcName, null);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_RESOURCES);
+        }
     }
 
     /**
@@ -750,7 +800,12 @@ public abstract class Drawable {
      */
     public static Drawable createFromResourceStream(Resources res, TypedValue value,
             InputStream is, String srcName) {
-        return createFromResourceStream(res, value, is, srcName, null);
+        Trace.traceBegin(Trace.TRACE_TAG_RESOURCES, srcName != null ? srcName : "Unknown drawable");
+        try {
+            return createFromResourceStream(res, value, is, srcName, null);
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_RESOURCES);
+        }
     }
 
     /**
@@ -843,10 +898,6 @@ public abstract class Drawable {
             drawable = new StateListDrawable();
         } else if (name.equals("level-list")) {
             drawable = new LevelListDrawable();
-        /* Probably not doing this.
-        } else if (name.equals("mipmap")) {
-            drawable = new MipmapDrawable();
-        */
         } else if (name.equals("layer-list")) {
             drawable = new LayerDrawable();
         } else if (name.equals("transition")) {
@@ -868,6 +919,7 @@ public abstract class Drawable {
         } else if (name.equals("inset")) {
             drawable = new InsetDrawable();
         } else if (name.equals("bitmap")) {
+            //noinspection deprecation
             drawable = new BitmapDrawable(r);
             if (r != null) {
                ((BitmapDrawable) drawable).setTargetDensity(r.getDisplayMetrics());
@@ -895,9 +947,14 @@ public abstract class Drawable {
             return null;
         }
 
-        Bitmap bm = BitmapFactory.decodeFile(pathName);
-        if (bm != null) {
-            return drawableFromBitmap(null, bm, null, null, null, pathName);
+        Trace.traceBegin(Trace.TRACE_TAG_RESOURCES, pathName);
+        try {
+            Bitmap bm = BitmapFactory.decodeFile(pathName);
+            if (bm != null) {
+                return drawableFromBitmap(null, bm, null, null, null, pathName);
+            }
+        } finally {
+            Trace.traceEnd(Trace.TRACE_TAG_RESOURCES);
         }
 
         return null;
@@ -964,6 +1021,13 @@ public abstract class Drawable {
          * this drawable (and thus require completely reloading it).
          */
         public abstract int getChangingConfigurations();
+
+        /**
+         * @hide
+         */
+        public Bitmap getBitmap() {
+            return null;
+        }
     }
 
     /**

@@ -50,6 +50,8 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.UserHandle;
+import android.util.ArrayMap;
 import android.util.Log;
 import android.view.Display;
 
@@ -133,6 +135,21 @@ final class ApplicationPackageManager extends PackageManager {
             int[] gids = mPM.getPackageGids(packageName);
             if (gids == null || gids.length > 0) {
                 return gids;
+            }
+        } catch (RemoteException e) {
+            throw new RuntimeException("Package manager has died", e);
+        }
+
+        throw new NameNotFoundException(packageName);
+    }
+
+    @Override
+    public int getPackageUid(String packageName, int userHandle)
+            throws NameNotFoundException {
+        try {
+            int uid = mPM.getPackageUid(packageName, userHandle);
+            if (uid >= 0) {
+                return uid;
             }
         } catch (RemoteException e) {
             throw new RuntimeException("Package manager has died", e);
@@ -411,17 +428,22 @@ final class ApplicationPackageManager extends PackageManager {
     @Override
     public List<PackageInfo> getInstalledPackages(int flags, int userId) {
         try {
-            final List<PackageInfo> packageInfos = new ArrayList<PackageInfo>();
-            PackageInfo lastItem = null;
-            ParceledListSlice<PackageInfo> slice;
+            ParceledListSlice<PackageInfo> slice = mPM.getInstalledPackages(flags, userId);
+            return slice.getList();
+        } catch (RemoteException e) {
+            throw new RuntimeException("Package manager has died", e);
+        }
+    }
 
-            do {
-                final String lastKey = lastItem != null ? lastItem.packageName : null;
-                slice = mPM.getInstalledPackages(flags, lastKey, userId);
-                lastItem = slice.populateList(packageInfos, PackageInfo.CREATOR);
-            } while (!slice.isLastSlice());
-
-            return packageInfos;
+    @SuppressWarnings("unchecked")
+    @Override
+    public List<PackageInfo> getPackagesHoldingPermissions(
+            String[] permissions, int flags) {
+        final int userId = mContext.getUserId();
+        try {
+            ParceledListSlice<PackageInfo> slice = mPM.getPackagesHoldingPermissions(
+                    permissions, flags, userId);
+            return slice.getList();
         } catch (RemoteException e) {
             throw new RuntimeException("Package manager has died", e);
         }
@@ -432,17 +454,8 @@ final class ApplicationPackageManager extends PackageManager {
     public List<ApplicationInfo> getInstalledApplications(int flags) {
         final int userId = mContext.getUserId();
         try {
-            final List<ApplicationInfo> applicationInfos = new ArrayList<ApplicationInfo>();
-            ApplicationInfo lastItem = null;
-            ParceledListSlice<ApplicationInfo> slice;
-
-            do {
-                final String lastKey = lastItem != null ? lastItem.packageName : null;
-                slice = mPM.getInstalledApplications(flags, lastKey, userId);
-                lastItem = slice.populateList(applicationInfos, ApplicationInfo.CREATOR);
-            } while (!slice.isLastSlice());
-
-            return applicationInfos;
+            ParceledListSlice<ApplicationInfo> slice = mPM.getInstalledApplications(flags, userId);
+            return slice.getList();
         } catch (RemoteException e) {
             throw new RuntimeException("Package manager has died", e);
         }
@@ -569,6 +582,22 @@ final class ApplicationPackageManager extends PackageManager {
     @Override
     public List<ResolveInfo> queryIntentServices(Intent intent, int flags) {
         return queryIntentServicesAsUser(intent, flags, mContext.getUserId());
+    }
+
+    @Override
+    public List<ResolveInfo> queryIntentContentProvidersAsUser(
+            Intent intent, int flags, int userId) {
+        try {
+            return mPM.queryIntentContentProviders(intent,
+                    intent.resolveTypeIfNeeded(mContext.getContentResolver()), flags, userId);
+        } catch (RemoteException e) {
+            throw new RuntimeException("Package manager has died", e);
+        }
+    }
+
+    @Override
+    public List<ResolveInfo> queryIntentContentProviders(Intent intent, int flags) {
+        return queryIntentContentProvidersAsUser(intent, flags, mContext.getUserId());
     }
 
     @Override
@@ -847,26 +876,20 @@ final class ApplicationPackageManager extends PackageManager {
             boolean needCleanup = false;
             for (String ssp : pkgList) {
                 synchronized (sSync) {
-                    if (sIconCache.size() > 0) {
-                        Iterator<ResourceName> it = sIconCache.keySet().iterator();
-                        while (it.hasNext()) {
-                            ResourceName nm = it.next();
-                            if (nm.packageName.equals(ssp)) {
-                                //Log.i(TAG, "Removing cached drawable for " + nm);
-                                it.remove();
-                                needCleanup = true;
-                            }
+                    for (int i=sIconCache.size()-1; i>=0; i--) {
+                        ResourceName nm = sIconCache.keyAt(i);
+                        if (nm.packageName.equals(ssp)) {
+                            //Log.i(TAG, "Removing cached drawable for " + nm);
+                            sIconCache.removeAt(i);
+                            needCleanup = true;
                         }
                     }
-                    if (sStringCache.size() > 0) {
-                        Iterator<ResourceName> it = sStringCache.keySet().iterator();
-                        while (it.hasNext()) {
-                            ResourceName nm = it.next();
-                            if (nm.packageName.equals(ssp)) {
-                                //Log.i(TAG, "Removing cached string for " + nm);
-                                it.remove();
-                                needCleanup = true;
-                            }
+                    for (int i=sStringCache.size()-1; i>=0; i--) {
+                        ResourceName nm = sStringCache.keyAt(i);
+                        if (nm.packageName.equals(ssp)) {
+                            //Log.i(TAG, "Removing cached string for " + nm);
+                            sStringCache.removeAt(i);
+                            needCleanup = true;
                         }
                     }
                 }
@@ -1053,7 +1076,7 @@ final class ApplicationPackageManager extends PackageManager {
     public int installExistingPackage(String packageName)
             throws NameNotFoundException {
         try {
-            int res = mPM.installExistingPackage(packageName);
+            int res = mPM.installExistingPackageAsUser(packageName, UserHandle.myUserId());
             if (res == INSTALL_FAILED_INVALID_URI) {
                 throw new NameNotFoundException("Package " + packageName + " doesn't exist");
             }
@@ -1115,7 +1138,7 @@ final class ApplicationPackageManager extends PackageManager {
     @Override
     public void deletePackage(String packageName, IPackageDeleteObserver observer, int flags) {
         try {
-            mPM.deletePackage(packageName, observer, flags);
+            mPM.deletePackageAsUser(packageName, observer, UserHandle.myUserId(), flags);
         } catch (RemoteException e) {
             // Should never happen!
         }
@@ -1244,6 +1267,16 @@ final class ApplicationPackageManager extends PackageManager {
     }
 
     @Override
+    public ComponentName getHomeActivities(List<ResolveInfo> outActivities) {
+        try {
+            return mPM.getHomeActivities(outActivities);
+        } catch (RemoteException e) {
+            // Should never happen!
+        }
+        return null;
+    }
+
+    @Override
     public void setComponentEnabledSetting(ComponentName componentName,
                                            int newState, int flags) {
         try {
@@ -1267,7 +1300,8 @@ final class ApplicationPackageManager extends PackageManager {
     public void setApplicationEnabledSetting(String packageName,
                                              int newState, int flags) {
         try {
-            mPM.setApplicationEnabledSetting(packageName, newState, flags, mContext.getUserId());
+            mPM.setApplicationEnabledSetting(packageName, newState, flags,
+                    mContext.getUserId(), mContext.getOpPackageName());
         } catch (RemoteException e) {
             // Should never happen!
         }
@@ -1281,6 +1315,28 @@ final class ApplicationPackageManager extends PackageManager {
             // Should never happen!
         }
         return PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
+    }
+
+    @Override
+    public boolean setApplicationBlockedSettingAsUser(String packageName, boolean blocked,
+            UserHandle user) {
+        try {
+            return mPM.setApplicationBlockedSettingAsUser(packageName, blocked,
+                    user.getIdentifier());
+        } catch (RemoteException re) {
+            // Should never happen!
+        }
+        return false;
+    }
+
+    @Override
+    public boolean getApplicationBlockedSettingAsUser(String packageName, UserHandle user) {
+        try {
+            return mPM.getApplicationBlockedSettingAsUser(packageName, user.getIdentifier());
+        } catch (RemoteException re) {
+            // Should never happen!
+        }
+        return false;
     }
 
     /**
@@ -1300,8 +1356,8 @@ final class ApplicationPackageManager extends PackageManager {
     private final IPackageManager mPM;
 
     private static final Object sSync = new Object();
-    private static HashMap<ResourceName, WeakReference<Drawable.ConstantState>> sIconCache
-            = new HashMap<ResourceName, WeakReference<Drawable.ConstantState>>();
-    private static HashMap<ResourceName, WeakReference<CharSequence>> sStringCache
-            = new HashMap<ResourceName, WeakReference<CharSequence>>();
+    private static ArrayMap<ResourceName, WeakReference<Drawable.ConstantState>> sIconCache
+            = new ArrayMap<ResourceName, WeakReference<Drawable.ConstantState>>();
+    private static ArrayMap<ResourceName, WeakReference<CharSequence>> sStringCache
+            = new ArrayMap<ResourceName, WeakReference<CharSequence>>();
 }

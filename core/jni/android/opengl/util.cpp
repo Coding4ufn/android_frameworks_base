@@ -557,9 +557,9 @@ void nativeUtilsClassInit(JNIEnv *env, jclass clazz)
 }
 
 extern void setGLDebugLevel(int level);
-void nativeEnableTracing(JNIEnv *env, jclass clazz)
+void setTracingLevel(JNIEnv *env, jclass clazz, jint level)
 {
-    setGLDebugLevel(1);
+    setGLDebugLevel(level);
 }
 
 static int checkFormat(SkBitmap::Config config, int format, int type)
@@ -632,7 +632,7 @@ static jint util_getInternalFormat(JNIEnv *env, jclass clazz,
     SkBitmap const * nativeBitmap =
             (SkBitmap const *)env->GetIntField(jbitmap, nativeBitmapID);
     const SkBitmap& bitmap(*nativeBitmap);
-    SkBitmap::Config config = bitmap.getConfig();
+    SkBitmap::Config config = bitmap.config();
     return getInternalFormat(config);
 }
 
@@ -642,7 +642,7 @@ static jint util_getType(JNIEnv *env, jclass clazz,
     SkBitmap const * nativeBitmap =
             (SkBitmap const *)env->GetIntField(jbitmap, nativeBitmapID);
     const SkBitmap& bitmap(*nativeBitmap);
-    SkBitmap::Config config = bitmap.getConfig();
+    SkBitmap::Config config = bitmap.config();
     return getType(config);
 }
 
@@ -653,7 +653,7 @@ static jint util_texImage2D(JNIEnv *env, jclass clazz,
     SkBitmap const * nativeBitmap =
             (SkBitmap const *)env->GetIntField(jbitmap, nativeBitmapID);
     const SkBitmap& bitmap(*nativeBitmap);
-    SkBitmap::Config config = bitmap.getConfig();
+    SkBitmap::Config config = bitmap.config();
     if (internalformat < 0) {
         internalformat = getInternalFormat(config);
     }
@@ -681,7 +681,7 @@ static jint util_texImage2D(JNIEnv *env, jclass clazz,
             SkColorTable* ctable = bitmap.getColorTable();
             memcpy(data, ctable->lockColors(), ctable->count() * sizeof(SkPMColor));
             memcpy(pixels, p, size);
-            ctable->unlockColors(false);
+            ctable->unlockColors();
             glCompressedTexImage2D(target, level, internalformat, w, h, border, imageSize, data);
             free(data);
         } else {
@@ -702,7 +702,7 @@ static jint util_texSubImage2D(JNIEnv *env, jclass clazz,
     SkBitmap const * nativeBitmap =
             (SkBitmap const *)env->GetIntField(jbitmap, nativeBitmapID);
     const SkBitmap& bitmap(*nativeBitmap);
-    SkBitmap::Config config = bitmap.getConfig();
+    SkBitmap::Config config = bitmap.config();
     if (format < 0) {
         format = getInternalFormat(config);
         if (format == GL_PALETTE8_RGBA8_OES)
@@ -1032,7 +1032,7 @@ static JNINativeMethod gUtilsMethods[] = {
     { "native_getType", "(Landroid/graphics/Bitmap;)I", (void*) util_getType },
     { "native_texImage2D", "(IIILandroid/graphics/Bitmap;II)I", (void*)util_texImage2D },
     { "native_texSubImage2D", "(IIIILandroid/graphics/Bitmap;II)I", (void*)util_texSubImage2D },
-    { "native_enableTracing", "()V",                    (void*)nativeEnableTracing },
+    { "setTracingLevel", "(I)V",                        (void*)setTracingLevel },
 };
 
 static JNINativeMethod gEtc1Methods[] = {

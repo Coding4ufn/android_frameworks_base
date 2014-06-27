@@ -315,6 +315,14 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public static final int FLAG_IS_DATA_ONLY = 1<<24;
 
     /**
+     * Value for {@link #flags}: set to {@code true} if the application
+     * is permitted to hold privileged permissions.
+     *
+     * {@hide}
+     */
+    public static final int FLAG_PRIVILEGED = 1<<30;
+
+    /**
      * Value for {@link #flags}: Set to true if the application has been
      * installed using the forward lock option.
      *
@@ -338,6 +346,13 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public static final int FLAG_CANT_SAVE_STATE = 1<<28;
 
     /**
+     * Value for {@link #flags}: true if the application is blocked via restrictions and for
+     * most purposes is considered as not installed.
+     * {@hide}
+     */
+    public static final int FLAG_BLOCKED = 1<<27;
+
+    /**
      * Flags associated with the application.  Any combination of
      * {@link #FLAG_SYSTEM}, {@link #FLAG_DEBUGGABLE}, {@link #FLAG_HAS_CODE},
      * {@link #FLAG_PERSISTENT}, {@link #FLAG_FACTORY_TEST}, and
@@ -351,7 +366,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * {@link #FLAG_INSTALLED}.
      */
     public int flags = 0;
-    
+
     /**
      * The required smallest screen width the application can run on.  If 0,
      * nothing has been specified.  Comes from
@@ -396,6 +411,15 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * {@hide}
      */
     public String[] resourceDirs;
+
+    /**
+     * String retrieved from the seinfo tag found in selinux policy. This value
+     * is useful in setting an SELinux security context on the process as well
+     * as its data directory.
+     *
+     * {@hide}
+     */
+    public String seinfo;
 
     /**
      * Paths to all shared libraries this application is linked against.  This
@@ -477,6 +501,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         if (resourceDirs != null) {
             pw.println(prefix + "resourceDirs=" + resourceDirs);
         }
+        if (seinfo != null) {
+            pw.println(prefix + "seinfo=" + seinfo);
+        }
         pw.println(prefix + "dataDir=" + dataDir);
         if (sharedLibraryFiles != null) {
             pw.println(prefix + "sharedLibraryFiles=" + sharedLibraryFiles);
@@ -544,6 +571,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         publicSourceDir = orig.publicSourceDir;
         nativeLibraryDir = orig.nativeLibraryDir;
         resourceDirs = orig.resourceDirs;
+        seinfo = orig.seinfo;
         sharedLibraryFiles = orig.sharedLibraryFiles;
         dataDir = orig.dataDir;
         uid = orig.uid;
@@ -583,6 +611,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeString(publicSourceDir);
         dest.writeString(nativeLibraryDir);
         dest.writeStringArray(resourceDirs);
+        dest.writeString(seinfo);
         dest.writeStringArray(sharedLibraryFiles);
         dest.writeString(dataDir);
         dest.writeInt(uid);
@@ -621,6 +650,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         publicSourceDir = source.readString();
         nativeLibraryDir = source.readString();
         resourceDirs = source.readStringArray();
+        seinfo = source.readString();
         sharedLibraryFiles = source.readStringArray();
         dataDir = source.readString();
         uid = source.readInt();

@@ -4,6 +4,7 @@
 #include "GraphicsJNI.h"
 #include "SkStream.h"
 #include "SkTypeface.h"
+#include "Utils.h"
 #include <android_runtime/android_util_AssetManager.h>
 #include <androidfw/AssetManager.h>
 
@@ -29,20 +30,40 @@ private:
 
 static SkTypeface* Typeface_create(JNIEnv* env, jobject, jstring name,
                                    SkTypeface::Style style) {
-    SkTypeface* face;
+    SkTypeface* face = NULL;
 
-    if (NULL == name) {
-        face = SkTypeface::CreateFromName(NULL, (SkTypeface::Style)style);
-    }
-    else {
+    if (NULL != name) {
         AutoJavaStringToUTF8    str(env, name);
         face = SkTypeface::CreateFromName(str.c_str(), style);
+        // Try to find the closest matching font, using the standard heuristic
+        if (NULL == face) {
+            face = SkTypeface::CreateFromName(str.c_str(), (SkTypeface::Style)(style ^ SkTypeface::kItalic));
+        }
+        for (int i = 0; NULL == face && i < 4; i++) {
+            face = SkTypeface::CreateFromName(str.c_str(), (SkTypeface::Style)i);
+        }
+    }
+
+    // return the default font at the best style if no exact match exists
+    if (NULL == face) {
+        face = SkTypeface::CreateFromName(NULL, style);
     }
     return face;
 }
 
 static SkTypeface* Typeface_createFromTypeface(JNIEnv* env, jobject, SkTypeface* family, int style) {
-    return SkTypeface::CreateFromTypeface(family, (SkTypeface::Style)style);
+    SkTypeface* face = SkTypeface::CreateFromTypeface(family, (SkTypeface::Style)style);
+    // Try to find the closest matching font, using the standard heuristic
+    if (NULL == face) {
+        face = SkTypeface::CreateFromTypeface(family, (SkTypeface::Style)(style ^ SkTypeface::kItalic));
+    }
+    for (int i = 0; NULL == face && i < 4; i++) {
+        face = SkTypeface::CreateFromTypeface(family, (SkTypeface::Style)i);
+    }
+    if (NULL == face) {
+        face = SkTypeface::CreateFromName(NULL, (SkTypeface::Style)style);
+    }
+    return face;
 }
 
 static void Typeface_unref(JNIEnv* env, jobject obj, SkTypeface* face) {
@@ -52,65 +73,6 @@ static void Typeface_unref(JNIEnv* env, jobject obj, SkTypeface* face) {
 static int Typeface_getStyle(JNIEnv* env, jobject obj, SkTypeface* face) {
     return face->style();
 }
-
-class AssetStream : public SkStream {
-public:
-    AssetStream(Asset* asset, bool hasMemoryBase) : fAsset(asset)
-    {
-        fMemoryBase = hasMemoryBase ? fAsset->getBuffer(false) : NULL;
-    }
-
-    virtual ~AssetStream()
-    {
-        delete fAsset;
-    }
-
-    virtual const void* getMemoryBase()
-    {
-        return fMemoryBase;
-    }
-
-	virtual bool rewind()
-    {
-        off64_t pos = fAsset->seek(0, SEEK_SET);
-        return pos != (off64_t)-1;
-    }
-
-	virtual size_t read(void* buffer, size_t size)
-    {
-        ssize_t amount;
-
-        if (NULL == buffer)
-        {
-            if (0 == size)  // caller is asking us for our total length
-                return fAsset->getLength();
-
-            // asset->seek returns new total offset
-            // we want to return amount that was skipped
-
-            off64_t oldOffset = fAsset->seek(0, SEEK_CUR);
-            if (-1 == oldOffset)
-                return 0;
-            off64_t newOffset = fAsset->seek(size, SEEK_CUR);
-            if (-1 == newOffset)
-                return 0;
-
-            amount = newOffset - oldOffset;
-        }
-        else
-        {
-            amount = fAsset->read(buffer, size);
-        }
-
-        if (amount < 0)
-            amount = 0;
-        return amount;
-    }
-
-private:
-    Asset*      fAsset;
-    const void* fMemoryBase;
-};
 
 static SkTypeface* Typeface_createFromAsset(JNIEnv* env, jobject,
                                             jobject jassetMgr,
@@ -130,7 +92,9 @@ static SkTypeface* Typeface_createFromAsset(JNIEnv* env, jobject,
         return NULL;
     }
 
-    SkStream* stream = new AssetStream(asset, true);
+    SkStream* stream = new AssetStreamAdaptor(asset,
+                                              AssetStreamAdaptor::kYes_OwnAsset,
+                                              AssetStreamAdaptor::kYes_HasMemoryBase);
     SkTypeface* face = SkTypeface::CreateFromStream(stream);
     // SkTypeFace::CreateFromStream calls ref() on the stream, so we
     // need to unref it here or it won't be freed later on
@@ -147,25 +111,6 @@ static SkTypeface* Typeface_createFromFile(JNIEnv* env, jobject, jstring jpath) 
     return SkTypeface::CreateFromFile(str.c_str());
 }
 
-#define MIN_GAMMA   (0.1f)
-#define MAX_GAMMA   (10.0f)
-static float pinGamma(float gamma) {
-    if (gamma < MIN_GAMMA) {
-        gamma = MIN_GAMMA;
-    } else if (gamma > MAX_GAMMA) {
-        gamma = MAX_GAMMA;
-    }
-    return gamma;
-}
-
-extern void skia_set_text_gamma(float, float);
-
-static void Typeface_setGammaForText(JNIEnv* env, jobject, jfloat blackGamma,
-                                     jfloat whiteGamma) {
-    // Comment this out for release builds. This is only used during development
-    skia_set_text_gamma(pinGamma(blackGamma), pinGamma(whiteGamma));
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 
 static JNINativeMethod gTypefaceMethods[] = {
@@ -177,7 +122,6 @@ static JNINativeMethod gTypefaceMethods[] = {
                                            (void*)Typeface_createFromAsset },
     { "nativeCreateFromFile",     "(Ljava/lang/String;)I",
                                            (void*)Typeface_createFromFile },
-    { "setGammaForText", "(FF)V", (void*)Typeface_setGammaForText },
 };
 
 int register_android_graphics_Typeface(JNIEnv* env)

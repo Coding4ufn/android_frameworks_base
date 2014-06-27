@@ -32,11 +32,9 @@ import android.hardware.usb.UsbAccessory;
 import android.hardware.usb.UsbManager;
 import android.os.FileUtils;
 import android.os.Handler;
-import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.os.ParcelFileDescriptor;
-import android.os.Process;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UEventObserver;
@@ -48,6 +46,7 @@ import android.util.Pair;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.server.FgThread;
 
 import java.io.File;
 import java.io.FileDescriptor;
@@ -57,6 +56,7 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -97,6 +97,13 @@ public class UsbDeviceManager {
     // We often get rapid connect/disconnect events when enabling USB functions,
     // which need debouncing.
     private static final int UPDATE_DELAY = 1000;
+
+    // Time we received a request to enter USB accessory mode
+    private long mAccessoryModeRequestTime = 0;
+
+    // Timeout for entering USB request mode.
+    // Request is cancelled if host does not configure device within 10 seconds.
+    private static final int ACCESSORY_REQUEST_TIMEOUT = 10 * 1000;
 
     private static final String BOOT_MODE_PROPERTY = "ro.bootmode";
 
@@ -158,18 +165,16 @@ public class UsbDeviceManager {
 
         readOemUsbOverrideConfig();
 
-        // create a thread for our Handler
-        HandlerThread thread = new HandlerThread("UsbDeviceManager",
-                Process.THREAD_PRIORITY_BACKGROUND);
-        thread.start();
-        mHandler = new UsbHandler(thread.getLooper());
+        mHandler = new UsbHandler(FgThread.get().getLooper());
 
         if (nativeIsStartRequested()) {
             if (DEBUG) Slog.d(TAG, "accessory attached at boot");
             startAccessoryMode();
         }
 
-        if ("1".equals(SystemProperties.get("ro.adb.secure"))) {
+        boolean secureAdbEnabled = SystemProperties.getBoolean("ro.adb.secure", false);
+        boolean dataEncrypted = "1".equals(SystemProperties.get("vold.decrypt"));
+        if (secureAdbEnabled && !dataEncrypted) {
             mDebuggingManager = new UsbDebuggingManager(context);
         }
     }
@@ -207,6 +212,8 @@ public class UsbDeviceManager {
     }
 
     private void startAccessoryMode() {
+        if (!mHasUsbAccessory) return;
+
         mAccessoryStrings = nativeGetAccessoryStrings();
         boolean enableAudio = (nativeGetAudioMode() == AUDIO_MODE_SOURCE);
         // don't start accessory mode if our mandatory strings have not been set
@@ -225,6 +232,7 @@ public class UsbDeviceManager {
         }
 
         if (functions != null) {
+            mAccessoryModeRequestTime = SystemClock.elapsedRealtime();
             setCurrentFunctions(functions, false);
         }
     }
@@ -243,7 +251,7 @@ public class UsbDeviceManager {
         for (int i = 0; i < serialLength; i++) {
             address[i % (ETH_ALEN - 1) + 1] ^= (int)serial.charAt(i);
         }
-        String addrString = String.format("%02X:%02X:%02X:%02X:%02X:%02X",
+        String addrString = String.format(Locale.US, "%02X:%02X:%02X:%02X:%02X:%02X",
             address[0], address[1], address[2], address[3], address[4], address[5]);
         try {
             FileUtils.stringToFile(RNDIS_ETH_ADDR_PATH, addrString);
@@ -458,6 +466,8 @@ public class UsbDeviceManager {
         }
 
         private void setEnabledFunctions(String functions, boolean makeDefault) {
+            if (DEBUG) Slog.d(TAG, "setEnabledFunctions " + functions
+                    + " makeDefault: " + makeDefault);
 
             // Do not update persystent.sys.usb.config if the device is booted up
             // with OEM specific mode.
@@ -519,9 +529,16 @@ public class UsbDeviceManager {
         }
 
         private void updateCurrentAccessory() {
-            if (!mHasUsbAccessory) return;
+            // We are entering accessory mode if we have received a request from the host
+            // and the request has not timed out yet.
+            boolean enteringAccessoryMode =
+                    mAccessoryModeRequestTime > 0 &&
+                        SystemClock.elapsedRealtime() <
+                            mAccessoryModeRequestTime + ACCESSORY_REQUEST_TIMEOUT;
 
-            if (mConfigured) {
+            if (mConfigured && enteringAccessoryMode) {
+                // successfully entered accessory mode
+
                 if (mAccessoryStrings != null) {
                     mCurrentAccessory = new UsbAccessory(mAccessoryStrings);
                     Slog.d(TAG, "entering USB accessory mode: " + mCurrentAccessory);
@@ -532,7 +549,7 @@ public class UsbDeviceManager {
                 } else {
                     Slog.e(TAG, "nativeGetAccessoryStrings failed");
                 }
-            } else if (!mConnected) {
+            } else if (!enteringAccessoryMode) {
                 // make sure accessory mode is off
                 // and restore default functions
                 Slog.d(TAG, "exited USB accessory mode");
@@ -562,6 +579,8 @@ public class UsbDeviceManager {
                 }
             }
 
+            if (DEBUG) Slog.d(TAG, "broadcasting " + intent + " connected: " + mConnected
+                                    + " configured: " + mConfigured);
             mContext.sendStickyBroadcastAsUser(intent, UserHandle.ALL);
         }
 
@@ -601,9 +620,7 @@ public class UsbDeviceManager {
                     if (containsFunction(mCurrentFunctions,
                             UsbManager.USB_FUNCTION_ACCESSORY)) {
                         updateCurrentAccessory();
-                    }
-
-                    if (!mConnected) {
+                    } else if (!mConnected) {
                         // restore defaults when USB is disconnected
                         setEnabledFunctions(mDefaultFunctions, false);
                     }
@@ -859,6 +876,15 @@ public class UsbDeviceManager {
     public void denyUsbDebugging() {
         if (mDebuggingManager != null) {
             mDebuggingManager.denyUsbDebugging();
+        }
+    }
+
+    public void clearUsbDebuggingKeys() {
+        if (mDebuggingManager != null) {
+            mDebuggingManager.clearUsbDebuggingKeys();
+        } else {
+            throw new RuntimeException("Cannot clear Usb Debugging keys, "
+                        + "UsbDebuggingManager not enabled");
         }
     }
 

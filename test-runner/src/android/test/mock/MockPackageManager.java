@@ -45,6 +45,9 @@ import android.content.res.Resources;
 import android.content.res.XmlResourceParser;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Binder;
+import android.os.RemoteException;
+import android.os.UserHandle;
 
 import java.util.List;
 
@@ -78,6 +81,13 @@ public class MockPackageManager extends PackageManager {
 
     @Override
     public int[] getPackageGids(String packageName) throws NameNotFoundException {
+        throw new UnsupportedOperationException();
+    }
+
+    /** @hide */
+    @Override
+    public int getPackageUid(String packageName, int userHandle)
+            throws NameNotFoundException {
         throw new UnsupportedOperationException();
     }
 
@@ -136,6 +146,12 @@ public class MockPackageManager extends PackageManager {
 
     @Override
     public List<PackageInfo> getInstalledPackages(int flags) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<PackageInfo> getPackagesHoldingPermissions(String[] permissions,
+            int flags) {
         throw new UnsupportedOperationException();
     }
 
@@ -263,6 +279,18 @@ public class MockPackageManager extends PackageManager {
     /** @hide */
     @Override
     public List<ResolveInfo> queryIntentServicesAsUser(Intent intent, int flags, int userId) {
+        throw new UnsupportedOperationException();
+    }
+
+    /** @hide */
+    @Override
+    public List<ResolveInfo> queryIntentContentProvidersAsUser(
+            Intent intent, int flags, int userId) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<ResolveInfo> queryIntentContentProviders(Intent intent, int flags) {
         throw new UnsupportedOperationException();
     }
 
@@ -528,6 +556,12 @@ public class MockPackageManager extends PackageManager {
         throw new UnsupportedOperationException();
     }
 
+    /** @hide - hidden in superclass */
+    @Override
+    public ComponentName getHomeActivities(List<ResolveInfo> outActivities) {
+        throw new UnsupportedOperationException();
+    }
+
     @Override
     public String[] getSystemSharedLibraryNames() {
         throw new UnsupportedOperationException();
@@ -566,6 +600,23 @@ public class MockPackageManager extends PackageManager {
             IPackageInstallObserver observer, int flags, String installerPackageName,
             VerificationParams verificationParams, ContainerEncryptionParams encryptionParams) {
         throw new UnsupportedOperationException();
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean setApplicationBlockedSettingAsUser(String packageName, boolean blocked,
+            UserHandle user) {
+        return false;
+    }
+
+    /**
+     * @hide
+     */
+    @Override
+    public boolean getApplicationBlockedSettingAsUser(String packageName, UserHandle user) {
+        return false;
     }
 
     /**

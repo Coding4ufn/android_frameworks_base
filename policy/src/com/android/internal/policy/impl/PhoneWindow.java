@@ -20,12 +20,11 @@ import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.View.MeasureSpec.getMode;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
-import static android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN;
-import static android.view.WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR;
-import static android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN;
-import static android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER;
-import static android.view.WindowManager.LayoutParams.FLAG_SPLIT_TOUCH;
+import static android.view.WindowManager.LayoutParams.*;
 
+import android.view.ViewConfiguration;
+
+import com.android.internal.R;
 import com.android.internal.view.RootViewSurfaceTaker;
 import com.android.internal.view.StandaloneActionMode;
 import com.android.internal.view.menu.ContextMenuBuilder;
@@ -37,6 +36,7 @@ import com.android.internal.view.menu.MenuPresenter;
 import com.android.internal.view.menu.MenuView;
 import com.android.internal.widget.ActionBarContainer;
 import com.android.internal.widget.ActionBarContextView;
+import com.android.internal.widget.ActionBarOverlayLayout;
 import com.android.internal.widget.ActionBarView;
 
 import android.app.KeyguardManager;
@@ -52,6 +52,7 @@ import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Debug;
 import android.os.Handler;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -61,6 +62,7 @@ import android.util.AndroidRuntimeException;
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.Log;
+import android.util.Slog;
 import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.ActionMode;
@@ -68,6 +70,7 @@ import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.IRotationWatcher;
 import android.view.IWindowManager;
+import android.view.InputEvent;
 import android.view.InputQueue;
 import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
@@ -80,6 +83,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewManager;
 import android.view.ViewParent;
+import android.view.ViewRootImpl;
 import android.view.ViewStub;
 import android.view.Window;
 import android.view.WindowManager;
@@ -141,6 +145,22 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     private ActionBarView mActionBar;
     private ActionMenuPresenterCallback mActionMenuPresenterCallback;
     private PanelMenuPresenterCallback mPanelMenuPresenterCallback;
+
+    // The icon resource has been explicitly set elsewhere
+    // and should not be overwritten with a default.
+    static final int FLAG_RESOURCE_SET_ICON = 1 << 0;
+
+    // The logo resource has been explicitly set elsewhere
+    // and should not be overwritten with a default.
+    static final int FLAG_RESOURCE_SET_LOGO = 1 << 1;
+
+    // The icon resource is currently configured to use the system fallback
+    // as no default was previously specified. Anything can override this.
+    static final int FLAG_RESOURCE_SET_ICON_FALLBACK = 1 << 2;
+
+    int mResourcesSetFlags;
+    int mIconRes;
+    int mLogoRes;
 
     private DrawableFeatureState[] mDrawables;
 
@@ -383,6 +403,15 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             st.createdPanelView = cb.onCreatePanelView(st.featureId);
         }
 
+        final boolean isActionBarMenu =
+                (st.featureId == FEATURE_OPTIONS_PANEL || st.featureId == FEATURE_ACTION_BAR);
+
+        if (isActionBarMenu && mActionBar != null) {
+            // Enforce ordering guarantees around events so that the action bar never
+            // dispatches menu-related events before the panel is prepared.
+            mActionBar.setMenuPrepared();
+        }
+
         if (st.createdPanelView == null) {
             // Init the panel state's menu--return false if init failed
             if (st.menu == null || st.refreshMenuContent) {
@@ -392,7 +421,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     }
                 }
 
-                if (mActionBar != null) {
+                if (isActionBarMenu && mActionBar != null) {
                     if (mActionMenuPresenterCallback == null) {
                         mActionMenuPresenterCallback = new ActionMenuPresenterCallback();
                     }
@@ -408,7 +437,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     // Ditch the menu created above
                     st.setMenu(null);
 
-                    if (mActionBar != null) {
+                    if (isActionBarMenu && mActionBar != null) {
                         // Don't show it in the action bar either
                         mActionBar.setMenu(null, mActionMenuPresenterCallback);
                     }
@@ -433,7 +462,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             }
 
             if (!cb.onPreparePanel(st.featureId, st.createdPanelView, st.menu)) {
-                if (mActionBar != null) {
+                if (isActionBarMenu && mActionBar != null) {
                     // The app didn't want to show the menu for now but it still exists.
                     // Clear it out of the action bar.
                     mActionBar.setMenu(null, mActionMenuPresenterCallback);
@@ -514,7 +543,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     @Override
     public final void openPanel(int featureId, KeyEvent event) {
         if (featureId == FEATURE_OPTIONS_PANEL && mActionBar != null &&
-                mActionBar.isOverflowReserved()) {
+                mActionBar.isOverflowReserved() &&
+                !ViewConfiguration.get(getContext()).hasPermanentMenuKey()) {
             if (mActionBar.getVisibility() == View.VISIBLE) {
                 mActionBar.showOverflowMenu();
             }
@@ -523,7 +553,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         }
     }
 
-    private void openPanel(PanelFeatureState st, KeyEvent event) {
+    private void openPanel(final PanelFeatureState st, KeyEvent event) {
         // System.out.println("Open panel: isOpen=" + st.isOpen);
 
         // Already open, return
@@ -621,7 +651,6 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             }
         }
 
-        st.isOpen = true;
         st.isHandled = false;
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams(
@@ -639,15 +668,17 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         }
 
         lp.windowAnimations = st.windowAnimations;
-        
+
         wm.addView(st.decorView, lp);
+        st.isOpen = true;
         // Log.v(TAG, "Adding main menu to window manager.");
     }
 
     @Override
     public final void closePanel(int featureId) {
         if (featureId == FEATURE_OPTIONS_PANEL && mActionBar != null &&
-                mActionBar.isOverflowReserved()) {
+                mActionBar.isOverflowReserved() &&
+                !ViewConfiguration.get(getContext()).hasPermanentMenuKey()) {
             mActionBar.hideOverflowMenu();
         } else if (featureId == FEATURE_CONTEXT_MENU) {
             closeContextMenu();
@@ -810,7 +841,8 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             boolean playSoundEffect = false;
             final PanelFeatureState st = getPanelState(featureId, true);
             if (featureId == FEATURE_OPTIONS_PANEL && mActionBar != null &&
-                    mActionBar.isOverflowReserved()) {
+                    mActionBar.isOverflowReserved() &&
+                    !ViewConfiguration.get(getContext()).hasPermanentMenuKey()) {
                 if (mActionBar.getVisibility() == View.VISIBLE) {
                     if (!mActionBar.isOverflowMenuShowing()) {
                         if (!isDestroyed() && preparePanel(st, event)) {
@@ -988,10 +1020,19 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
     }
 
     private void reopenMenu(boolean toggleMenuMode) {
-        if (mActionBar != null && mActionBar.isOverflowReserved()) {
+        if (mActionBar != null && mActionBar.isOverflowReserved() &&
+                (!ViewConfiguration.get(getContext()).hasPermanentMenuKey() ||
+                        mActionBar.isOverflowMenuShowPending())) {
             final Callback cb = getCallback();
             if (!mActionBar.isOverflowMenuShowing() || !toggleMenuMode) {
                 if (cb != null && !isDestroyed() && mActionBar.getVisibility() == View.VISIBLE) {
+                    // If we have a menu invalidation pending, do it now.
+                    if (mInvalidatePanelMenuPosted &&
+                            (mInvalidatePanelMenuFeatures & (1 << FEATURE_OPTIONS_PANEL)) != 0) {
+                        mDecor.removeCallbacks(mInvalidatePanelMenuRunnable);
+                        mInvalidatePanelMenuRunnable.run();
+                    }
+
                     final PanelFeatureState st = getPanelState(FEATURE_OPTIONS_PANEL, true);
 
                     // If we don't have a menu or we're waiting for a full content refresh,
@@ -1378,6 +1419,75 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             horizontalProgressBar.startAnimation(anim);
             horizontalProgressBar.setVisibility(View.INVISIBLE);
         }
+    }
+
+    @Override
+    public void setIcon(int resId) {
+        mIconRes = resId;
+        mResourcesSetFlags |= FLAG_RESOURCE_SET_ICON;
+        mResourcesSetFlags &= ~FLAG_RESOURCE_SET_ICON_FALLBACK;
+        if (mActionBar != null) {
+            mActionBar.setIcon(resId);
+        }
+    }
+
+    @Override
+    public void setDefaultIcon(int resId) {
+        if ((mResourcesSetFlags & FLAG_RESOURCE_SET_ICON) != 0) {
+            return;
+        }
+        mIconRes = resId;
+        if (mActionBar != null && (!mActionBar.hasIcon() ||
+                (mResourcesSetFlags & FLAG_RESOURCE_SET_ICON_FALLBACK) != 0)) {
+            if (resId != 0) {
+                mActionBar.setIcon(resId);
+                mResourcesSetFlags &= ~FLAG_RESOURCE_SET_ICON_FALLBACK;
+            } else {
+                mActionBar.setIcon(getContext().getPackageManager().getDefaultActivityIcon());
+                mResourcesSetFlags |= FLAG_RESOURCE_SET_ICON_FALLBACK;
+            }
+        }
+    }
+
+    @Override
+    public void setLogo(int resId) {
+        mLogoRes = resId;
+        mResourcesSetFlags |= FLAG_RESOURCE_SET_LOGO;
+        if (mActionBar != null) {
+            mActionBar.setLogo(resId);
+        }
+    }
+
+    @Override
+    public void setDefaultLogo(int resId) {
+        if ((mResourcesSetFlags & FLAG_RESOURCE_SET_LOGO) != 0) {
+            return;
+        }
+        mLogoRes = resId;
+        if (mActionBar != null && !mActionBar.hasLogo()) {
+            mActionBar.setLogo(resId);
+        }
+    }
+
+    @Override
+    public void setLocalFocus(boolean hasFocus, boolean inTouchMode) {
+        getViewRootImpl().windowFocusChanged(hasFocus, inTouchMode);
+
+    }
+
+    @Override
+    public void injectInputEvent(InputEvent event) {
+        getViewRootImpl().dispatchInputEvent(event);
+    }
+
+    private ViewRootImpl getViewRootImpl() {
+        if (mDecor != null) {
+            ViewRootImpl viewRootImpl = mDecor.getViewRootImpl();
+            if (viewRootImpl != null) {
+                return viewRootImpl;
+            }
+        }
+        throw new IllegalStateException("view not added");
     }
 
     /**
@@ -1812,6 +1922,11 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         private PopupWindow mActionModePopup;
         private Runnable mShowActionModePopup;
 
+        // View added at runtime to draw under the status bar area
+        private View mStatusGuard;
+        // View added at runtime to draw under the navigation bar area
+        private View mNavigationGuard;
+
         public DecorView(Context context, int featureId) {
             super(context);
             mFeatureId = featureId;
@@ -2230,6 +2345,10 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     originalView.getWindowToken());
             if (helper != null) {
                 helper.setPresenterCallback(mContextMenuCallback);
+            } else if (mContextMenuHelper != null) {
+                // No menu to show, but if we have a menu currently showing it just became blank.
+                // Close it.
+                mContextMenuHelper.dismiss();
             }
             mContextMenuHelper = helper;
             return helper != null;
@@ -2266,8 +2385,6 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                         mActionModeView = new ActionBarContextView(mContext);
                         mActionModePopup = new PopupWindow(mContext, null,
                                 com.android.internal.R.attr.actionModePopupWindowStyle);
-                        mActionModePopup.setLayoutInScreenEnabled(true);
-                        mActionModePopup.setLayoutInsetDecor(true);
                         mActionModePopup.setWindowLayoutType(
                                 WindowManager.LayoutParams.TYPE_APPLICATION);
                         mActionModePopup.setContentView(mActionModeView);
@@ -2369,10 +2486,89 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         @Override
         protected boolean fitSystemWindows(Rect insets) {
             mFrameOffsets.set(insets);
+            updateStatusGuard(insets);
+            updateNavigationGuard(insets);
             if (getForeground() != null) {
                 drawableChanged();
             }
             return super.fitSystemWindows(insets);
+        }
+
+        private void updateStatusGuard(Rect insets) {
+            boolean showStatusGuard = false;
+            // Show the status guard when the non-overlay contextual action bar is showing
+            if (mActionModeView != null) {
+                if (mActionModeView.getLayoutParams() instanceof MarginLayoutParams) {
+                    MarginLayoutParams mlp = (MarginLayoutParams) mActionModeView.getLayoutParams();
+                    boolean mlpChanged = false;
+                    final boolean nonOverlayShown =
+                            (getLocalFeatures() & (1 << FEATURE_ACTION_MODE_OVERLAY)) == 0
+                            && mActionModeView.isShown();
+                    if (nonOverlayShown) {
+                        // set top margin to top insets, show status guard
+                        if (mlp.topMargin != insets.top) {
+                            mlpChanged = true;
+                            mlp.topMargin = insets.top;
+                            if (mStatusGuard == null) {
+                                mStatusGuard = new View(mContext);
+                                mStatusGuard.setBackgroundColor(mContext.getResources()
+                                        .getColor(R.color.input_method_navigation_guard));
+                                addView(mStatusGuard, new LayoutParams(
+                                        LayoutParams.MATCH_PARENT, mlp.topMargin,
+                                        Gravity.START | Gravity.TOP));
+                            } else {
+                                LayoutParams lp = (LayoutParams) mStatusGuard.getLayoutParams();
+                                if (lp.height != mlp.topMargin) {
+                                    lp.height = mlp.topMargin;
+                                    mStatusGuard.setLayoutParams(lp);
+                                }
+                            }
+                        }
+                        insets.top = 0;  // consume top insets
+                        showStatusGuard = true;
+                    } else {
+                        // reset top margin
+                        if (mlp.topMargin != 0) {
+                            mlpChanged = true;
+                            mlp.topMargin = 0;
+                        }
+                    }
+                    if (mlpChanged) {
+                        mActionModeView.setLayoutParams(mlp);
+                    }
+                }
+            }
+            if (mStatusGuard != null) {
+                mStatusGuard.setVisibility(showStatusGuard ? View.VISIBLE : View.GONE);
+            }
+        }
+
+        private void updateNavigationGuard(Rect insets) {
+            // IMEs lay out below the nav bar, but the content view must not (for back compat)
+            if (getAttributes().type == WindowManager.LayoutParams.TYPE_INPUT_METHOD) {
+                // prevent the content view from including the nav bar height
+                if (mContentParent != null) {
+                    if (mContentParent.getLayoutParams() instanceof MarginLayoutParams) {
+                        MarginLayoutParams mlp =
+                                (MarginLayoutParams) mContentParent.getLayoutParams();
+                        mlp.bottomMargin = insets.bottom;
+                        mContentParent.setLayoutParams(mlp);
+                    }
+                }
+                // position the navigation guard view, creating it if necessary
+                if (mNavigationGuard == null) {
+                    mNavigationGuard = new View(mContext);
+                    mNavigationGuard.setBackgroundColor(mContext.getResources()
+                            .getColor(R.color.input_method_navigation_guard));
+                    addView(mNavigationGuard, new LayoutParams(
+                            LayoutParams.MATCH_PARENT, insets.bottom,
+                            Gravity.START | Gravity.BOTTOM));
+                } else {
+                    LayoutParams lp = (LayoutParams) mNavigationGuard.getLayoutParams();
+                    lp.height = insets.bottom;
+                    mNavigationGuard.setLayoutParams(lp);
+                }
+            }
         }
 
         private void drawableChanged() {
@@ -2551,6 +2747,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
             }
 
             public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                requestFitSystemWindows();
                 return mWrapped.onPrepareActionMode(mode, menu);
             }
 
@@ -2577,6 +2774,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     }
                 }
                 mActionMode = null;
+                requestFitSystemWindows();
             }
         }
     }
@@ -2641,7 +2839,23 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
         }
 
         if (a.getBoolean(com.android.internal.R.styleable.Window_windowFullscreen, false)) {
-            setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN&(~getForcedWindowFlags()));
+            setFlags(FLAG_FULLSCREEN, FLAG_FULLSCREEN & (~getForcedWindowFlags()));
+        }
+
+        if (a.getBoolean(com.android.internal.R.styleable.Window_windowTranslucentStatus,
+                false)) {
+            setFlags(FLAG_TRANSLUCENT_STATUS, FLAG_TRANSLUCENT_STATUS
+                    & (~getForcedWindowFlags()));
+        }
+
+        if (a.getBoolean(com.android.internal.R.styleable.Window_windowTranslucentNavigation,
+                false)) {
+            setFlags(FLAG_TRANSLUCENT_NAVIGATION, FLAG_TRANSLUCENT_NAVIGATION
+                    & (~getForcedWindowFlags()));
+        }
+
+        if (a.getBoolean(com.android.internal.R.styleable.Window_windowOverscan, false)) {
+            setFlags(FLAG_LAYOUT_IN_OVERSCAN, FLAG_LAYOUT_IN_OVERSCAN&(~getForcedWindowFlags()));
         }
 
         if (a.getBoolean(com.android.internal.R.styleable.Window_windowShowWallpaper, false)) {
@@ -2790,11 +3004,7 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                         com.android.internal.R.attr.dialogTitleDecorLayout, res, true);
                 layoutResource = res.resourceId;
             } else if ((features & (1 << FEATURE_ACTION_BAR)) != 0) {
-                if ((features & (1 << FEATURE_ACTION_BAR_OVERLAY)) != 0) {
-                    layoutResource = com.android.internal.R.layout.screen_action_bar_overlay;
-                } else {
-                    layoutResource = com.android.internal.R.layout.screen_action_bar;
-                }
+                layoutResource = com.android.internal.R.layout.screen_action_bar;
             } else {
                 layoutResource = com.android.internal.R.layout.screen_title;
             }
@@ -2908,6 +3118,13 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                         mActionBar.initIndeterminateProgress();
                     }
 
+                    final ActionBarOverlayLayout abol = (ActionBarOverlayLayout) findViewById(
+                            com.android.internal.R.id.action_bar_overlay_layout);
+                    if (abol != null) {
+                        abol.setOverlayMode(
+                                (localFeatures & (1 << FEATURE_ACTION_BAR_OVERLAY)) != 0);
+                    }
+
                     boolean splitActionBar = false;
                     final boolean splitWhenNarrow =
                             (mUiOptions & ActivityInfo.UIOPTION_SPLIT_ACTION_BAR_WHEN_NARROW) != 0;
@@ -2933,6 +3150,20 @@ public class PhoneWindow extends Window implements MenuBuilder.Callback {
                     } else if (splitActionBar) {
                         Log.e(TAG, "Requested split action bar with " +
                                 "incompatible window decor! Ignoring request.");
+                    }
+
+                    if ((mResourcesSetFlags & FLAG_RESOURCE_SET_ICON) != 0 ||
+                            (mIconRes != 0 && !mActionBar.hasIcon())) {
+                        mActionBar.setIcon(mIconRes);
+                    } else if ((mResourcesSetFlags & FLAG_RESOURCE_SET_ICON) == 0 &&
+                            mIconRes == 0 && !mActionBar.hasIcon()) {
+                        mActionBar.setIcon(
+                                getContext().getPackageManager().getDefaultActivityIcon());
+                        mResourcesSetFlags |= FLAG_RESOURCE_SET_ICON_FALLBACK;
+                    }
+                    if ((mResourcesSetFlags & FLAG_RESOURCE_SET_LOGO) != 0 ||
+                            (mLogoRes != 0 && !mActionBar.hasLogo())) {
+                        mActionBar.setLogo(mLogoRes);
                     }
 
                     // Post the panel invalidate for later; avoid application onCreateOptionsMenu

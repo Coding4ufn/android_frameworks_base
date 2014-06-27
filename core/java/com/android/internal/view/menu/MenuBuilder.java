@@ -247,10 +247,16 @@ public class MenuBuilder implements Menu {
         startDispatchingItemsChanged();
     }
     
-    private boolean dispatchSubMenuSelected(SubMenuBuilder subMenu) {
+    private boolean dispatchSubMenuSelected(SubMenuBuilder subMenu,
+            MenuPresenter preferredPresenter) {
         if (mPresenters.isEmpty()) return false;
 
         boolean result = false;
+
+        // Try the preferred presenter first.
+        if (preferredPresenter != null) {
+            result = preferredPresenter.onSubMenuSelected(subMenu);
+        }
 
         for (WeakReference<MenuPresenter> ref : mPresenters) {
             final MenuPresenter presenter = ref.get();
@@ -865,6 +871,10 @@ public class MenuBuilder implements Menu {
     }
 
     public boolean performItemAction(MenuItem item, int flags) {
+        return performItemAction(item, null, flags);
+    }
+
+    public boolean performItemAction(MenuItem item, MenuPresenter preferredPresenter, int flags) {
         MenuItemImpl itemImpl = (MenuItemImpl) item;
         
         if (itemImpl == null || !itemImpl.isEnabled()) {
@@ -889,7 +899,7 @@ public class MenuBuilder implements Menu {
             if (providerHasSubMenu) {
                 provider.onPrepareSubMenu(subMenu);
             }
-            invoked |= dispatchSubMenuSelected(subMenu);
+            invoked |= dispatchSubMenuSelected(subMenu, preferredPresenter);
             if (!invoked) close(true);
         } else {
             if ((flags & FLAG_PERFORM_NO_CLOSE) == 0) {
@@ -1034,6 +1044,10 @@ public class MenuBuilder implements Menu {
      * to avoid inadvertent reordering that may break the app's intended design.
      */
     public void flagActionItems() {
+        // Important side effect: if getVisibleItems is stale it may refresh,
+        // which can affect action items staleness.
+        final ArrayList<MenuItemImpl> visibleItems = getVisibleItems();
+
         if (!mIsActionItemsStale) {
             return;
         }
@@ -1052,7 +1066,6 @@ public class MenuBuilder implements Menu {
         if (flagged) {
             mActionItems.clear();
             mNonActionItems.clear();
-            ArrayList<MenuItemImpl> visibleItems = getVisibleItems();
             final int itemsSize = visibleItems.size();
             for (int i = 0; i < itemsSize; i++) {
                 MenuItemImpl item = visibleItems.get(i);

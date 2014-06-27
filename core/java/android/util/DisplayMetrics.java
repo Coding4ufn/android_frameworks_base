@@ -67,11 +67,28 @@ public class DisplayMetrics {
     public static final int DENSITY_XHIGH = 320;
 
     /**
+     * Intermediate density for screens that sit somewhere between
+     * {@link #DENSITY_XHIGH} (320dpi) and {@link #DENSITY_XXHIGH} (480 dpi).
+     * This is not a density that applications should target, instead relying
+     * on the system to scale their {@link #DENSITY_XXHIGH} assets for them.
+     */
+    public static final int DENSITY_400 = 400;
+
+    /**
      * Standard quantized DPI for extra-extra-high-density screens.  Applications
      * should not generally worry about this density; relying on XHIGH graphics
      * being scaled up to it should be sufficient for almost all cases.
      */
     public static final int DENSITY_XXHIGH = 480;
+
+    /**
+     * Standard quantized DPI for extra-extra-extra-high-density screens.  Applications
+     * should not generally worry about this density; relying on XHIGH graphics
+     * being scaled up to it should be sufficient for almost all cases.  A typical
+     * use of this density would be 4K television screens -- 3840x2160, which
+     * is 2x a traditional HD 1920x1080 screen which runs at DENSITY_XHIGH.
+     */
+    public static final int DENSITY_XXXHIGH = 640;
 
     /**
      * The reference density used throughout the system.

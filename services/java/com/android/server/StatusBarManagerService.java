@@ -17,6 +17,7 @@
 package com.android.server;
 
 import android.app.StatusBarManager;
+import android.service.notification.StatusBarNotification;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -33,7 +34,6 @@ import com.android.internal.statusbar.IStatusBar;
 import com.android.internal.statusbar.IStatusBarService;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.statusbar.StatusBarIconList;
-import com.android.internal.statusbar.StatusBarNotification;
 import com.android.server.wm.WindowManagerService;
 
 import java.io.FileDescriptor;
@@ -397,6 +397,15 @@ public class StatusBarManagerService extends IStatusBarService.Stub
     public void setCurrentUser(int newUserId) {
         if (SPEW) Slog.d(TAG, "Setting current user to user " + newUserId);
         mCurrentUserId = newUserId;
+    }
+
+    @Override
+    public void setWindowState(int window, int state) {
+        if (mBar != null) {
+            try {
+                mBar.setWindowState(window, state);
+            } catch (RemoteException ex) {}
+        }
     }
 
     private void enforceStatusBar() {

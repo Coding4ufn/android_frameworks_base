@@ -48,6 +48,7 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.WindowManager.BadTokenException;
 import android.view.animation.AnimationUtils;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
@@ -380,7 +381,6 @@ public class InputMethodService extends AbstractInputMethodService {
             if (DEBUG) Log.v(TAG, "unbindInput(): binding=" + mInputBinding
                     + " ic=" + mInputConnection);
             onUnbindInput();
-            mInputStarted = false;
             mInputBinding = null;
             mInputConnection = null;
         }
@@ -421,10 +421,16 @@ public class InputMethodService extends AbstractInputMethodService {
             boolean wasVis = isInputViewShown();
             mShowInputFlags = 0;
             if (onShowInputRequested(flags, false)) {
-                showWindow(true);
+                try {
+                    showWindow(true);
+                } catch (BadTokenException e) {
+                    if (DEBUG) Log.v(TAG, "BadTokenException: IME is done.");
+                    mWindowVisible = false;
+                    mWindowAdded = false;
+                }
             }
             // If user uses hard keyboard, IME button should always be shown.
-            boolean showing = onEvaluateInputViewShown();
+            boolean showing = isInputViewShown();
             mImm.setImeWindowStatus(mToken, IME_ACTIVE | (showing ? IME_VISIBLE : 0),
                     mBackDisposition);
             if (resultReceiver != null) {
@@ -681,6 +687,8 @@ public class InputMethodService extends AbstractInputMethodService {
         mThemeAttrs = obtainStyledAttributes(android.R.styleable.InputMethodService);
         mRootView = mInflater.inflate(
                 com.android.internal.R.layout.input_method, null);
+        mRootView.setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         mWindow.setContentView(mRootView);
         mRootView.getViewTreeObserver().addOnComputeInternalInsetsListener(mInsetsComputer);
         if (Settings.Global.getInt(getContentResolver(),
@@ -712,7 +720,7 @@ public class InputMethodService extends AbstractInputMethodService {
         super.onDestroy();
         mRootView.getViewTreeObserver().removeOnComputeInternalInsetsListener(
                 mInsetsComputer);
-        finishViews();
+        doFinishInput();
         if (mWindowAdded) {
             // Disable exit animation for the current IME window
             // to avoid the race condition between the exit and enter animations
@@ -1644,6 +1652,11 @@ public class InputMethodService extends AbstractInputMethodService {
      * the text.  This is called whether or not the input method has requested
      * extracted text updates, although if so it will not receive this call
      * if the extracted text has changed as well.
+     *
+     * <p>Be careful about changing the text in reaction to this call with
+     * methods such as setComposingText, commitText or
+     * deleteSurroundingText. If the cursor moves as a result, this method
+     * will be called again, which may result in an infinite loop.
      * 
      * <p>The default implementation takes care of updating the cursor in
      * the extract text, if it is being shown.
@@ -1955,7 +1968,7 @@ public class InputMethodService extends AbstractInputMethodService {
         ic.sendKeyEvent(new KeyEvent(eventTime, eventTime,
                 KeyEvent.ACTION_DOWN, keyEventCode, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
                 KeyEvent.FLAG_SOFT_KEYBOARD|KeyEvent.FLAG_KEEP_TOUCH_MODE));
-        ic.sendKeyEvent(new KeyEvent(SystemClock.uptimeMillis(), eventTime,
+        ic.sendKeyEvent(new KeyEvent(eventTime, SystemClock.uptimeMillis(),
                 KeyEvent.ACTION_UP, keyEventCode, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0,
                 KeyEvent.FLAG_SOFT_KEYBOARD|KeyEvent.FLAG_KEEP_TOUCH_MODE));
     }

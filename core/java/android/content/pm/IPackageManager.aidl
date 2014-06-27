@@ -53,6 +53,7 @@ import android.content.IntentSender;
  *  {@hide}
  */
 interface IPackageManager {
+    boolean isPackageAvailable(String packageName, int userId);
     PackageInfo getPackageInfo(String packageName, int flags, int userId);
     int getPackageUid(String packageName, int userId);
     int[] getPackageGids(String packageName);
@@ -101,7 +102,9 @@ interface IPackageManager {
     String getNameForUid(int uid);
     
     int getUidForSharedUser(String sharedUserName);
-    
+
+    int getFlagsForUid(int uid);
+
     ResolveInfo resolveIntent(in Intent intent, String resolvedType, int flags, int userId);
 
     List<ResolveInfo> queryIntentActivities(in Intent intent, 
@@ -121,13 +124,25 @@ interface IPackageManager {
     List<ResolveInfo> queryIntentServices(in Intent intent,
             String resolvedType, int flags, int userId);
 
+    List<ResolveInfo> queryIntentContentProviders(in Intent intent,
+            String resolvedType, int flags, int userId);
+
     /**
      * This implements getInstalledPackages via a "last returned row"
      * mechanism that is not exposed in the API. This is to get around the IPC
      * limit that kicks in when flags are included that bloat up the data
      * returned.
      */
-    ParceledListSlice getInstalledPackages(int flags, in String lastRead, in int userId);
+    ParceledListSlice getInstalledPackages(int flags, in int userId);
+
+    /**
+     * This implements getPackagesHoldingPermissions via a "last returned row"
+     * mechanism that is not exposed in the API. This is to get around the IPC
+     * limit that kicks in when flags are included that bloat up the data
+     * returned.
+     */
+    ParceledListSlice getPackagesHoldingPermissions(in String[] permissions,
+            int flags, int userId);
 
     /**
      * This implements getInstalledApplications via a "last returned row"
@@ -135,7 +150,7 @@ interface IPackageManager {
      * limit that kicks in when flags are included that bloat up the data
      * returned.
      */
-    ParceledListSlice getInstalledApplications(int flags, in String lastRead, int userId);
+    ParceledListSlice getInstalledApplications(int flags, int userId);
 
     /**
      * Retrieve all applications that are marked as persistent.
@@ -185,21 +200,31 @@ interface IPackageManager {
     void setInstallerPackageName(in String targetPackage, in String installerPackageName);
 
     /**
-     * Delete a package.
+     * Delete a package for a specific user.
      *
      * @param packageName The fully qualified name of the package to delete.
      * @param observer a callback to use to notify when the package deletion in finished.
+     * @param userId the id of the user for whom to delete the package
      * @param flags - possible values: {@link #DONT_DELETE_DATA}
      */
-    void deletePackage(in String packageName, IPackageDeleteObserver observer, int flags);
+    void deletePackageAsUser(in String packageName, IPackageDeleteObserver observer,
+            int userId, int flags);
 
     String getInstallerPackageName(in String packageName);
 
     void addPackageToPreferred(String packageName);
-    
+
     void removePackageFromPreferred(String packageName);
-    
+
     List<PackageInfo> getPreferredPackages(int flags);
+
+    void resetPreferredActivities(int userId);
+
+    ResolveInfo getLastChosenActivity(in Intent intent,
+            String resolvedType, int flags);
+
+    void setLastChosenActivity(in Intent intent, String resolvedType, int flags,
+            in IntentFilter filter, int match, in ComponentName activity);
 
     void addPreferredActivity(in IntentFilter filter, int match,
             in ComponentName[] set, in ComponentName activity, int userId);
@@ -211,7 +236,13 @@ interface IPackageManager {
 
     int getPreferredActivities(out List<IntentFilter> outFilters,
             out List<ComponentName> outActivities, String packageName);
-    
+
+    /**
+     * Report the set of 'Home' activity candidates, plus (if any) which of them
+     * is the current "always use this one" setting.
+     */
+     ComponentName getHomeActivities(out List<ResolveInfo> outHomeCandidates);
+
     /**
      * As per {@link android.content.pm.PackageManager#setComponentEnabledSetting}.
      */
@@ -226,7 +257,8 @@ interface IPackageManager {
     /**
      * As per {@link android.content.pm.PackageManager#setApplicationEnabledSetting}.
      */
-    void setApplicationEnabledSetting(in String packageName, in int newState, int flags, int userId);
+    void setApplicationEnabledSetting(in String packageName, in int newState, int flags,
+            int userId, String callingPackage);
     
     /**
      * As per {@link android.content.pm.PackageManager#getApplicationEnabledSetting}.
@@ -370,7 +402,7 @@ interface IPackageManager {
             in VerificationParams verificationParams,
             in ContainerEncryptionParams encryptionParams);
 
-    int installExistingPackage(String packageName);
+    int installExistingPackageAsUser(String packageName, int userId);
 
     void verifyPendingInstall(int id, int verificationCode);
     void extendVerificationTimeout(int id, int verificationCodeAtTimeout, long millisecondsToDelay);
@@ -385,4 +417,7 @@ interface IPackageManager {
 
     /** Reflects current DeviceStorageMonitorService state */
     boolean isStorageLow();
+
+    boolean setApplicationBlockedSettingAsUser(String packageName, boolean blocked, int userId);
+    boolean getApplicationBlockedSettingAsUser(String packageName, int userId);
 }

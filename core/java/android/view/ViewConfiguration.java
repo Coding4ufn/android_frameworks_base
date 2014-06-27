@@ -97,6 +97,13 @@ public class ViewConfiguration {
     private static final int DOUBLE_TAP_TIMEOUT = 300;
 
     /**
+     * Defines the minimum duration in milliseconds between the first tap's up event and
+     * the second tap's down event for an interaction to be considered a
+     * double-tap.
+     */
+    private static final int DOUBLE_TAP_MIN_TIME = 40;
+
+    /**
      * Defines the maximum duration in milliseconds between a touch pad
      * touch and release for a given touch to be considered a tap (click) as
      * opposed to a hover movement gesture.
@@ -205,6 +212,14 @@ public class ViewConfiguration {
      */
     private static final int OVERFLING_DISTANCE = 6;
 
+    /**
+     * Configuration values for overriding {@link #hasPermanentMenuKey()} behavior.
+     * These constants must match the definition in res/values/config.xml.
+     */
+    private static final int HAS_PERMANENT_MENU_KEY_AUTODETECT = 0;
+    private static final int HAS_PERMANENT_MENU_KEY_TRUE = 1;
+    private static final int HAS_PERMANENT_MENU_KEY_FALSE = 2;
+
     private final int mEdgeSlop;
     private final int mFadingEdgeLength;
     private final int mMinimumFlingVelocity;
@@ -289,12 +304,31 @@ public class ViewConfiguration {
         mOverflingDistance = (int) (sizeAndDensity * OVERFLING_DISTANCE + 0.5f);
 
         if (!sHasPermanentMenuKeySet) {
-            IWindowManager wm = WindowManagerGlobal.getWindowManagerService();
-            try {
-                sHasPermanentMenuKey = !wm.hasSystemNavBar() && !wm.hasNavigationBar();
-                sHasPermanentMenuKeySet = true;
-            } catch (RemoteException ex) {
-                sHasPermanentMenuKey = false;
+            final int configVal = res.getInteger(
+                    com.android.internal.R.integer.config_overrideHasPermanentMenuKey);
+
+            switch (configVal) {
+                default:
+                case HAS_PERMANENT_MENU_KEY_AUTODETECT: {
+                    IWindowManager wm = WindowManagerGlobal.getWindowManagerService();
+                    try {
+                        sHasPermanentMenuKey = !wm.hasNavigationBar();
+                        sHasPermanentMenuKeySet = true;
+                    } catch (RemoteException ex) {
+                        sHasPermanentMenuKey = false;
+                    }
+                }
+                break;
+
+                case HAS_PERMANENT_MENU_KEY_TRUE:
+                    sHasPermanentMenuKey = true;
+                    sHasPermanentMenuKeySet = true;
+                    break;
+
+                case HAS_PERMANENT_MENU_KEY_FALSE:
+                    sHasPermanentMenuKey = false;
+                    sHasPermanentMenuKeySet = true;
+                    break;
             }
         }
 
@@ -433,6 +467,17 @@ public class ViewConfiguration {
      */
     public static int getDoubleTapTimeout() {
         return DOUBLE_TAP_TIMEOUT;
+    }
+
+    /**
+     * @return the minimum duration in milliseconds between the first tap's
+     * up event and the second tap's down event for an interaction to be considered a
+     * double-tap.
+     *
+     * @hide
+     */
+    public static int getDoubleTapMinTime() {
+        return DOUBLE_TAP_MIN_TIME;
     }
 
     /**

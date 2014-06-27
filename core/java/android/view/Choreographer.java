@@ -23,6 +23,9 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.util.Log;
+import android.util.TimeUtils;
+
+import java.io.PrintWriter;
 
 /**
  * Coordinates the timing of animations, input and drawing.
@@ -254,6 +257,15 @@ public final class Choreographer {
     public static long subtractFrameDelay(long delayMillis) {
         final long frameDelay = sFrameDelay;
         return delayMillis <= frameDelay ? 0 : delayMillis - frameDelay;
+    }
+
+    void dump(String prefix, PrintWriter writer) {
+        String innerPrefix = prefix + "  ";
+        writer.print(prefix); writer.println("Choreographer:");
+        writer.print(innerPrefix); writer.print("mFrameScheduled=");
+                writer.println(mFrameScheduled);
+        writer.print(innerPrefix); writer.print("mLastFrameTime=");
+                writer.println(TimeUtils.formatUptime(mLastFrameTimeNanos / 1000000));
     }
 
     /**
@@ -693,7 +705,7 @@ public final class Choreographer {
             // At this time Surface Flinger won't send us vsyncs for secondary displays
             // but that could change in the future so let's log a message to help us remember
             // that we need to fix this.
-            if (builtInDisplayId != Surface.BUILT_IN_DISPLAY_ID_MAIN) {
+            if (builtInDisplayId != SurfaceControl.BUILT_IN_DISPLAY_ID_MAIN) {
                 Log.d(TAG, "Received vsync from secondary display, but we don't support "
                         + "this case yet.  Choreographer needs a way to explicitly request "
                         + "vsync for a specific display to ensure it doesn't lose track "

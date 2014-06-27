@@ -22,6 +22,7 @@ import android.graphics.BitmapFactory;
 import android.util.TypedValue;
 
 /**
+ * Only intended for use by generated reflected code.
  *
  **/
 public class AllocationAdapter extends Allocation {
@@ -223,7 +224,6 @@ public class AllocationAdapter extends Allocation {
     }
 
     static public AllocationAdapter create2D(RenderScript rs, Allocation a) {
-        android.util.Log.e("rs", "create2d " + a);
         rs.validate();
         AllocationAdapter aa = new AllocationAdapter(0, rs, a);
         aa.mConstrainedLOD = true;

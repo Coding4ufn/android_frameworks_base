@@ -152,6 +152,8 @@ static jfieldID gPointF_yFieldID;
 static jclass   gBitmap_class;
 static jfieldID gBitmap_nativeInstanceID;
 static jmethodID gBitmap_constructorMethodID;
+static jmethodID gBitmap_reinitMethodID;
+static jmethodID gBitmap_getAllocationByteCountMethodID;
 
 static jclass   gBitmapConfig_class;
 static jfieldID gBitmapConfig_nativeInstanceID;
@@ -344,25 +346,59 @@ SkRegion* GraphicsJNI::getNativeRegion(JNIEnv* env, jobject region)
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
+// Assert that bitmap's SkAlphaType is consistent with isPremultiplied.
+static void assert_premultiplied(const SkBitmap& bitmap, bool isPremultiplied) {
+    // kOpaque_SkAlphaType and kIgnore_SkAlphaType mean that isPremultiplied is
+    // irrelevant. This just tests to ensure that the SkAlphaType is not
+    // opposite of isPremultiplied.
+    if (isPremultiplied) {
+        SkASSERT(bitmap.alphaType() != kUnpremul_SkAlphaType);
+    } else {
+        SkASSERT(bitmap.alphaType() != kPremul_SkAlphaType);
+    }
+}
+
 jobject GraphicsJNI::createBitmap(JNIEnv* env, SkBitmap* bitmap, jbyteArray buffer,
-                                  bool isMutable, jbyteArray ninepatch, jintArray layoutbounds,
-                                  int density)
+        int bitmapCreateFlags, jbyteArray ninepatch, jintArray layoutbounds, int density)
 {
     SkASSERT(bitmap);
     SkASSERT(bitmap->pixelRef());
+    bool isMutable = bitmapCreateFlags & kBitmapCreateFlag_Mutable;
+    bool isPremultiplied = bitmapCreateFlags & kBitmapCreateFlag_Premultiplied;
+
+    // The caller needs to have already set the alpha type properly, so the
+    // native SkBitmap stays in sync with the Java Bitmap.
+    assert_premultiplied(*bitmap, isPremultiplied);
+
     jobject obj = env->NewObject(gBitmap_class, gBitmap_constructorMethodID,
-            static_cast<jint>(reinterpret_cast<uintptr_t>(bitmap)),
-            buffer, isMutable, ninepatch, layoutbounds, density);
+            static_cast<jint>(reinterpret_cast<uintptr_t>(bitmap)), buffer,
+            bitmap->width(), bitmap->height(), density, isMutable, isPremultiplied,
+            ninepatch, layoutbounds);
     hasException(env); // For the side effect of logging.
     return obj;
 }
 
-jobject GraphicsJNI::createBitmap(JNIEnv* env, SkBitmap* bitmap, bool isMutable,
-                            jbyteArray ninepatch, int density)
+jobject GraphicsJNI::createBitmap(JNIEnv* env, SkBitmap* bitmap, int bitmapCreateFlags,
+        jbyteArray ninepatch, int density)
 {
-    return createBitmap(env, bitmap, NULL, isMutable, ninepatch, NULL, density);
+    return createBitmap(env, bitmap, NULL, bitmapCreateFlags, ninepatch, NULL, density);
 }
 
+void GraphicsJNI::reinitBitmap(JNIEnv* env, jobject javaBitmap, SkBitmap* bitmap,
+        bool isPremultiplied)
+{
+    // The caller needs to have already set the alpha type properly, so the
+    // native SkBitmap stays in sync with the Java Bitmap.
+    assert_premultiplied(*bitmap, isPremultiplied);
+
+    env->CallVoidMethod(javaBitmap, gBitmap_reinitMethodID,
+            bitmap->width(), bitmap->height(), isPremultiplied);
+}
+
+int GraphicsJNI::getBitmapAllocationByteCount(JNIEnv* env, jobject javaBitmap)
+{
+    return env->CallIntMethod(javaBitmap, gBitmap_getAllocationByteCountMethodID);
+}
 
 jobject GraphicsJNI::createBitmapRegionDecoder(JNIEnv* env, SkBitmapRegionDecoder* bitmap)
 {
@@ -397,8 +433,10 @@ static JNIEnv* vm2env(JavaVM* vm)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-AndroidPixelRef::AndroidPixelRef(JNIEnv* env, void* storage, size_t size, jbyteArray storageObj,
-        SkColorTable* ctable) : SkMallocPixelRef(storage, size, ctable) {
+AndroidPixelRef::AndroidPixelRef(JNIEnv* env, const SkImageInfo& info, void* storage,
+        size_t rowBytes, jbyteArray storageObj, SkColorTable* ctable) :
+        SkMallocPixelRef(info, storage, rowBytes, ctable, (storageObj == NULL)),
+        fWrappedPixelRef(NULL) {
     SkASSERT(storage);
     SkASSERT(env);
 
@@ -412,31 +450,62 @@ AndroidPixelRef::AndroidPixelRef(JNIEnv* env, void* storage, size_t size, jbyteA
 
     // If storageObj is NULL, the memory was NOT allocated on the Java heap
     fOnJavaHeap = (storageObj != NULL);
+}
 
+AndroidPixelRef::AndroidPixelRef(AndroidPixelRef& wrappedPixelRef, const SkImageInfo& info,
+        size_t rowBytes, SkColorTable* ctable) :
+        SkMallocPixelRef(info, wrappedPixelRef.getAddr(), rowBytes, ctable, false),
+        fWrappedPixelRef(wrappedPixelRef.fWrappedPixelRef ?
+                wrappedPixelRef.fWrappedPixelRef : &wrappedPixelRef)
+{
+    SkASSERT(fWrappedPixelRef);
+    SkSafeRef(fWrappedPixelRef);
+
+    // don't need to initialize these, as all the relevant logic delegates to the wrapped ref
+    fStorageObj = NULL;
+    fHasGlobalRef = false;
+    fGlobalRefCnt = 0;
+    fOnJavaHeap = false;
 }
 
 AndroidPixelRef::~AndroidPixelRef() {
-    if (fOnJavaHeap) {
+    if (fWrappedPixelRef) {
+        SkSafeUnref(fWrappedPixelRef);
+    } else if (fOnJavaHeap) {
         JNIEnv* env = vm2env(fVM);
 
         if (fStorageObj && fHasGlobalRef) {
             env->DeleteGlobalRef(fStorageObj);
         }
         fStorageObj = NULL;
-
-        // Set this to NULL to prevent the SkMallocPixelRef destructor
-        // from freeing the memory.
-        fStorage = NULL;
     }
+}
+jbyteArray AndroidPixelRef::getStorageObj() {
+    if (fWrappedPixelRef) {
+        return fWrappedPixelRef->fStorageObj;
+    }
+    return fStorageObj;
 }
 
 void AndroidPixelRef::setLocalJNIRef(jbyteArray arr) {
-    if (!fHasGlobalRef) {
+    if (fWrappedPixelRef) {
+        // delegate java obj management to the wrapped ref
+        fWrappedPixelRef->setLocalJNIRef(arr);
+    } else if (!fHasGlobalRef) {
         fStorageObj = arr;
     }
 }
 
 void AndroidPixelRef::globalRef(void* localref) {
+    if (fWrappedPixelRef) {
+        // delegate java obj management to the wrapped ref
+        fWrappedPixelRef->globalRef(localref);
+
+        // Note: we only ref and unref the wrapped AndroidPixelRef so that
+        // bitmap->pixelRef()->globalRef() and globalUnref() can be used in a pair, even if
+        // the bitmap has its underlying AndroidPixelRef swapped out/wrapped
+        return;
+    }
     if (fOnJavaHeap && sk_atomic_inc(&fGlobalRefCnt) == 0) {
         JNIEnv *env = vm2env(fVM);
 
@@ -461,6 +530,11 @@ void AndroidPixelRef::globalRef(void* localref) {
 }
 
 void AndroidPixelRef::globalUnref() {
+    if (fWrappedPixelRef) {
+        // delegate java obj management to the wrapped ref
+        fWrappedPixelRef->globalUnref();
+        return;
+    }
     if (fOnJavaHeap && sk_atomic_dec(&fGlobalRefCnt) == 1) {
         JNIEnv *env = vm2env(fVM);
         if (!fHasGlobalRef) {
@@ -487,13 +561,21 @@ jbyteArray GraphicsJNI::allocateJavaPixelRef(JNIEnv* env, SkBitmap* bitmap,
         return NULL;
     }
 
+    SkImageInfo bitmapInfo;
+    if (!bitmap->asImageInfo(&bitmapInfo)) {
+        jniThrowException(env, "java/lang/IllegalArgumentException",
+                "unknown bitmap configuration");
+        return NULL;
+    }
+
     size_t size = size64.get32();
     jbyteArray arrayObj = env->NewByteArray(size);
     if (arrayObj) {
         // TODO: make this work without jniGetNonMovableArrayElements
         jbyte* addr = jniGetNonMovableArrayElements(&env->functions, arrayObj);
         if (addr) {
-            SkPixelRef* pr = new AndroidPixelRef(env, (void*) addr, size, arrayObj, ctable);
+            SkPixelRef* pr = new AndroidPixelRef(env, bitmapInfo, (void*) addr,
+                    bitmap->rowBytes(), arrayObj, ctable);
             bitmap->setPixelRef(pr)->unref();
             // since we're already allocated, we lockPixels right away
             // HeapAllocator behaves this way too
@@ -586,8 +668,9 @@ int register_android_graphics_Graphics(JNIEnv* env)
 
     gBitmap_class = make_globalref(env, "android/graphics/Bitmap");
     gBitmap_nativeInstanceID = getFieldIDCheck(env, gBitmap_class, "mNativeBitmap", "I");
-    gBitmap_constructorMethodID = env->GetMethodID(gBitmap_class, "<init>",
-                                            "(I[BZ[B[II)V");
+    gBitmap_constructorMethodID = env->GetMethodID(gBitmap_class, "<init>", "(I[BIIIZZ[B[I)V");
+    gBitmap_reinitMethodID = env->GetMethodID(gBitmap_class, "reinit", "(IIZ)V");
+    gBitmap_getAllocationByteCountMethodID = env->GetMethodID(gBitmap_class, "getAllocationByteCount", "()I");
     gBitmapRegionDecoder_class = make_globalref(env, "android/graphics/BitmapRegionDecoder");
     gBitmapRegionDecoder_constructorMethodID = env->GetMethodID(gBitmapRegionDecoder_class, "<init>", "(I)V");
 

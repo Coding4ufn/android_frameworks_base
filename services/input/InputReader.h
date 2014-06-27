@@ -21,9 +21,9 @@
 #include "PointerController.h"
 #include "InputListener.h"
 
-#include <androidfw/Input.h>
-#include <androidfw/VelocityControl.h>
-#include <androidfw/VelocityTracker.h>
+#include <input/Input.h>
+#include <input/VelocityControl.h>
+#include <input/VelocityTracker.h>
 #include <utils/KeyedVector.h>
 #include <utils/threads.h>
 #include <utils/Timers.h>
@@ -409,7 +409,7 @@ public:
 
 protected:
     // These members are protected so they can be instrumented by test cases.
-    virtual InputDevice* createDeviceLocked(int32_t deviceId,
+    virtual InputDevice* createDeviceLocked(int32_t deviceId, int32_t controllerNumber,
             const InputDeviceIdentifier& identifier, uint32_t classes);
 
     class ContextImpl : public InputReaderContext {
@@ -507,16 +507,17 @@ private:
 /* Represents the state of a single input device. */
 class InputDevice {
 public:
-    InputDevice(InputReaderContext* context, int32_t id, int32_t generation,
-            const InputDeviceIdentifier& identifier, uint32_t classes);
+    InputDevice(InputReaderContext* context, int32_t id, int32_t generation, int32_t
+            controllerNumber, const InputDeviceIdentifier& identifier, uint32_t classes);
     ~InputDevice();
 
     inline InputReaderContext* getContext() { return mContext; }
-    inline int32_t getId() { return mId; }
-    inline int32_t getGeneration() { return mGeneration; }
-    inline const String8& getName() { return mIdentifier.name; }
-    inline uint32_t getClasses() { return mClasses; }
-    inline uint32_t getSources() { return mSources; }
+    inline int32_t getId() const { return mId; }
+    inline int32_t getControllerNumber() const { return mControllerNumber; }
+    inline int32_t getGeneration() const { return mGeneration; }
+    inline const String8& getName() const { return mIdentifier.name; }
+    inline uint32_t getClasses() const { return mClasses; }
+    inline uint32_t getSources() const { return mSources; }
 
     inline bool isExternal() { return mIsExternal; }
     inline void setExternal(bool external) { mIsExternal = external; }
@@ -573,6 +574,7 @@ public:
 private:
     InputReaderContext* mContext;
     int32_t mId;
+    int32_t mControllerNumber;
     int32_t mGeneration;
     InputDeviceIdentifier mIdentifier;
     String8 mAlias;
@@ -790,6 +792,10 @@ struct CookedPointerData {
     CookedPointerData();
     void clear();
     void copyFrom(const CookedPointerData& other);
+
+    inline const PointerCoords& pointerCoordsForId(uint32_t id) const {
+        return pointerCoords[idToIndex[id]];
+    }
 
     inline bool isHovering(uint32_t pointerIndex) {
         return hoveringIdBits.hasBit(pointerProperties[pointerIndex].id);
@@ -1180,6 +1186,7 @@ protected:
         DEVICE_MODE_DISABLED, // input is disabled
         DEVICE_MODE_DIRECT, // direct mapping (touchscreen)
         DEVICE_MODE_UNSCALED, // unscaled mapping (touchpad)
+        DEVICE_MODE_NAVIGATION, // unscaled mapping with assist gesture (touch navigation)
         DEVICE_MODE_POINTER, // pointer mapping (pointer)
     };
     DeviceMode mDeviceMode;
@@ -1192,6 +1199,7 @@ protected:
         enum DeviceType {
             DEVICE_TYPE_TOUCH_SCREEN,
             DEVICE_TYPE_TOUCH_PAD,
+            DEVICE_TYPE_TOUCH_NAVIGATION,
             DEVICE_TYPE_POINTER,
         };
 
@@ -1199,6 +1207,7 @@ protected:
         bool hasAssociatedDisplay;
         bool associatedDisplayIsExternal;
         bool orientationAware;
+        bool hasButtonUnderPad;
 
         enum GestureMode {
             GESTURE_MODE_POINTER,
@@ -1261,12 +1270,23 @@ protected:
         bool haveDistanceScale;
         float distanceScale;
 
+        enum CoverageCalibration {
+            COVERAGE_CALIBRATION_DEFAULT,
+            COVERAGE_CALIBRATION_NONE,
+            COVERAGE_CALIBRATION_BOX,
+        };
+
+        CoverageCalibration coverageCalibration;
+
         inline void applySizeScaleAndBias(float* outSize) const {
             if (haveSizeScale) {
                 *outSize *= sizeScale;
             }
             if (haveSizeBias) {
                 *outSize += sizeBias;
+            }
+            if (*outSize < 0) {
+                *outSize = 0;
             }
         }
     } mCalibration;
@@ -1729,10 +1749,11 @@ private:
         float highScale;  // scale factor from raw to normalized values of high split
         float highOffset; // offset to add after scaling for normalization of high split
 
-        float min;     // normalized inclusive minimum
-        float max;     // normalized inclusive maximum
-        float flat;    // normalized flat region size
-        float fuzz;    // normalized error tolerance
+        float min;        // normalized inclusive minimum
+        float max;        // normalized inclusive maximum
+        float flat;       // normalized flat region size
+        float fuzz;       // normalized error tolerance
+        float resolution; // normalized resolution in units/mm
 
         float filter;  // filter out small variations of this size
         float currentValue; // current value
@@ -1743,7 +1764,7 @@ private:
         void initialize(const RawAbsoluteAxisInfo& rawAxisInfo, const AxisInfo& axisInfo,
                 bool explicitlyMapped, float scale, float offset,
                 float highScale, float highOffset,
-                float min, float max, float flat, float fuzz) {
+                float min, float max, float flat, float fuzz, float resolution) {
             this->rawAxisInfo = rawAxisInfo;
             this->axisInfo = axisInfo;
             this->explicitlyMapped = explicitlyMapped;
@@ -1755,6 +1776,7 @@ private:
             this->max = max;
             this->flat = flat;
             this->fuzz = fuzz;
+            this->resolution = resolution;
             this->filter = 0;
             resetValue();
         }
@@ -1782,6 +1804,11 @@ private:
             float newValue, float currentValue, float thresholdValue);
 
     static bool isCenteredAxis(int32_t axis);
+    static int32_t getCompatAxis(int32_t axis);
+
+    static void addMotionRange(int32_t axisId, const Axis& axis, InputDeviceInfo* info);
+    static void setPointerCoordsAxisValue(PointerCoords* pointerCoords, int32_t axis,
+            float value);
 };
 
 } // namespace android

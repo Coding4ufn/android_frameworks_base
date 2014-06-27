@@ -123,6 +123,18 @@ option java_package com.android.server
 # ---------------------------
 # Out of memory for surfaces.
 31000 wm_no_surface_memory (Window|3),(PID|1|5),(Operation|3)
+# Task created.
+31001 wm_task_created (TaskId|1|5),(StackId|1|5)
+# Task moved to top (1) or bottom (0).
+31002 wm_task_moved (TaskId|1|5),(ToTop|1),(Index|1)
+# Task removed with source explanation.
+31003 wm_task_removed (TaskId|1|5),(Reason|3)
+# Stack created.
+31004 wm_stack_created (StackId|1|5),(RelativeBoxId|1|5),(Position|1),(Weight|1|6)
+# Home stack moved to top (1) or bottom (0).
+31005 wm_home_stack_moved (ToTop|1)
+# Stack removed.
+31006 wm_stack_removed (StackId|1|5)
 
 
 # ---------------------------
@@ -157,3 +169,20 @@ option java_package com.android.server
 # ConfigUpdateInstallReceiver.java
 # ---------------------------
 51300 config_install_failed (dir|3)
+
+# ---------------------------
+# IntentFirewall.java
+# ---------------------------
+51400 ifw_intent_matched (Intent Type|1|5),(Component Name|3),(Caller Uid|1|5),(Caller Pkg Count|1|1),(Caller Pkgs|3),(Action|3),(MIME Type|3),(URI|3),(Flags|1|5)
+
+# ---------------------------
+# IdleMaintenanceService.java
+# ---------------------------
+2753 idle_maintenance_window_start (time|2|3), (lastUserActivity|2|3), (batteryLevel|1|6), (batteryCharging|1|5)
+2754 idle_maintenance_window_finish (time|2|3), (lastUserActivity|2|3), (batteryLevel|1|6), (batteryCharging|1|5)
+
+# ---------------------------
+# MountService.java
+# ---------------------------
+2755 fstrim_start (time|2|3)
+2756 fstrim_finish (time|2|3)

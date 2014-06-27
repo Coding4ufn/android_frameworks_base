@@ -19,7 +19,7 @@ package com.android.internal.statusbar;
 import com.android.internal.statusbar.IStatusBar;
 import com.android.internal.statusbar.StatusBarIcon;
 import com.android.internal.statusbar.StatusBarIconList;
-import com.android.internal.statusbar.StatusBarNotification;
+import android.service.notification.StatusBarNotification;
 
 /** @hide */
 interface IStatusBarService
@@ -51,4 +51,5 @@ interface IStatusBarService
     void toggleRecentApps();
     void preloadRecentApps();
     void cancelPreloadRecentApps();
+    void setWindowState(int window, int state);
 }
