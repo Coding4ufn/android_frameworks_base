@@ -182,11 +182,9 @@ public class LocationManager {
         new HashMap<LocationListener,ListenerTransport>();
 
     //////////////////////////////////////////////////////////////////////////////////
-    // LocationHelper code
+    // Start SVMP location interception code
 
-    // permission and actions for broadcast intents
-    public static final String RECEIVE_LOCATION_ACTIONS =
-            "org.mitre.svmp.permission.RECEIVE_LOCATION_ACTIONS";
+    // actions for broadcast intents
     public static final String LOCATION_SUBSCRIBE_ACTION =
             "org.mitre.svmp.action.LOCATION_SUBSCRIBE";
     public static final String LOCATION_UNSUBSCRIBE_ACTION =
@@ -312,6 +310,8 @@ public class LocationManager {
                 request.getNumUpdates() == 1
                 );
     }
+
+    // End SVMP location interception code
     //////////////////////////////////////////////////////////////////////////////////
 
     private class ListenerTransport extends ILocationListener.Stub {

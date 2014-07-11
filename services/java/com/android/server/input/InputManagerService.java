@@ -56,6 +56,7 @@ import android.os.IBinder;
 import android.os.Looper;
 import android.os.Message;
 import android.os.MessageQueue;
+import android.os.Parcel;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -89,6 +90,10 @@ import java.util.HashSet;
 
 import libcore.io.Streams;
 import libcore.util.Objects;
+
+// Start SVMP keyboard injection code
+import android.view.KeyCharacterMap;
+// End SVMP keyboard injection code
 
 /*
  * Wraps the C++ InputManager and provides its callbacks.
@@ -309,6 +314,13 @@ public class InputManagerService extends IInputManager.Stub
                 reloadDeviceAliases();
             }
         }, filter, null, mHandler);
+
+        // Start SVMP keyboard injection code
+        filter = new IntentFilter(KEYBOARD_ATTACHED_ACTION);
+        filter.addAction(KEYBOARD_DETACHED_ACTION);
+        // register a receiver and only receive broadcasts from senders that have the SVMP_BROADCAST permission
+        mContext.registerReceiver(svmpKeyboardReceiver, filter, "org.mitre.svmp.permission.SVMP_BROADCAST", null);
+        // End SVMP keyboard injection code
 
         mHandler.sendEmptyMessage(MSG_RELOAD_DEVICE_ALIASES);
         mHandler.sendEmptyMessage(MSG_UPDATE_KEYBOARD_LAYOUTS);
@@ -1637,4 +1649,92 @@ public class InputManagerService extends IInputManager.Stub
             onVibratorTokenDied(this);
         }
     }
+
+    // Start SVMP keyboard injection code
+    private static final String KEYBOARD_ATTACHED_ACTION = "org.mitre.svmp.action.KEYBOARD_ATTACHED";
+    private static final String KEYBOARD_DETACHED_ACTION = "org.mitre.svmp.action.KEYBOARD_DETACHED";
+
+    private BroadcastReceiver svmpKeyboardReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (KEYBOARD_ATTACHED_ACTION.equals(intent.getAction())) {
+                int id = intent.getIntExtra("id", 0);
+                Log.d(TAG, "Received SVMP Keyboard Attached broadcast, id: " + id);
+
+                // a hardware keyboard was just attached
+                // "attach" two new virtual keyboards
+                try {
+                    // create parcels for two keyboards
+                    Parcel alphabeticParcel = makeInputDeviceParcel(id, (id*3)+1, true);
+                    Parcel nonAlphabeticParcel = makeInputDeviceParcel(id+1, (id+1)*3, false);
+                    // create two new virtual keyboards from the parcels
+                    InputDevice alphabetic = InputDevice.CREATOR.createFromParcel(alphabeticParcel);
+                    InputDevice nonAlphabetic = InputDevice.CREATOR.createFromParcel(nonAlphabeticParcel);
+                    // recycle the parcels that we used
+                    alphabeticParcel.recycle();
+                    nonAlphabeticParcel.recycle();
+                    // create a new device array that is 2 elements larger than the old one, copy over old contents
+                    InputDevice[] newDeviceArray = new InputDevice[mInputDevices.length + 2];
+                    System.arraycopy(mInputDevices, 0, newDeviceArray, 0, mInputDevices.length);
+                    // add new virtual keyboards to new device array
+                    newDeviceArray[newDeviceArray.length-2] = alphabetic;
+                    newDeviceArray[newDeviceArray.length-1] = nonAlphabetic;
+                    // trigger device change
+                    notifyInputDevicesChanged(newDeviceArray);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to attach virtual keyboard: ", e);
+                }
+            }
+            else if (KEYBOARD_DETACHED_ACTION.equals(intent.getAction())) {
+                Log.d(TAG, "Received SVMP Keyboard Detached broadcast");
+
+                // a hardware keyboard was just detached
+                // we have two virtual keyboards "attached"; remove them
+                try {
+                    InputDevice[] newDeviceArray = new InputDevice[mInputDevices.length - 2];
+                    int ctr = 0;
+                    for (InputDevice device : mInputDevices) {
+                        if (!device.getName().equals("SVMP USB Keyboard"))
+                            newDeviceArray[ctr++] = device;
+                    }
+                    notifyInputDevicesChanged(newDeviceArray);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to detach virtual keyboard: ", e);
+                }
+            }
+        }
+    };
+
+    private Parcel makeInputDeviceParcel(int id, int generation, boolean alphabetic) {
+        // http://androidxref.com/4.2.2_r1/xref/frameworks/base/core/java/android/view/InputDevice.java
+        // http://androidxref.com/4.2.2_r1/xref/frameworks/base/core/java/android/view/KeyCharacterMap.java
+        // http://androidxref.com/4.2.2_r1/xref/frameworks/base/libs/androidfw/KeyCharacterMap.cpp
+        // http://androidxref.com/4.2.2_r1/xref/frameworks/base/include/androidfw/KeyCharacterMap.h
+        Parcel parcel = Parcel.obtain();
+        parcel.writeInt(id); // device ID
+        parcel.writeInt(generation); // generation
+        //parcel.writeInt(0); // controller number
+        parcel.writeString("SVMP USB Keyboard"); // name
+        //parcel.writeInt(9610); // vendor ID
+        //parcel.writeInt(1); // product ID
+        parcel.writeString("0123456789abcdef0123456789abcdef01234567"); // descriptor
+        parcel.writeInt(1); // is external
+        parcel.writeInt(257); // sources
+        parcel.writeInt(alphabetic ? 2 : 1); // keyboard type
+        InputDevice virtual = getInputDevice(-1);
+        KeyCharacterMap kcm = virtual.getKeyCharacterMap();
+        kcm.writeToParcel(parcel, 0);
+        //parcel.writeInt(0); // KeyCharacterMap, type "unknown"
+        //parcel.writeInt(0); // KeyCharacterMap, number of keys
+        //parcel.writeInt(0); // ?
+        parcel.writeInt(0); // has vibrator
+        //parcel.writeInt(0); // has button under pad
+        parcel.writeInt(-1); // motion ranges (none)
+
+        // set the data position back to the beginning so this parcel can be read
+        parcel.setDataPosition(0);
+
+        return parcel;
+    }
+    // End SVMP keyboard injection code
 }

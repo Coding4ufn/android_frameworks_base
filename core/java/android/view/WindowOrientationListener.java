@@ -16,18 +16,13 @@
 
 package android.view;
 
+// Start SVMP rotation injection code (modified entire file)
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-//import android.hardware.Sensor;
-//import android.hardware.SensorEvent;
-//import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.os.SystemProperties;
-import android.util.FloatMath;
 import android.util.Log;
-//import android.util.Slog;
 
 /**
  * A special helper class used by the WindowManager
@@ -48,8 +43,7 @@ public abstract class WindowOrientationListener {
     private static final boolean DEBUG = false;
     private static final boolean localLOGV = DEBUG || false;
 
-    private static final boolean USE_GRAVITY_SENSOR = false;
-
+    private static final String SVMP_BROADCAST_PERMISSION = "org.mitre.svmp.permission.SVMP_BROADCAST";
     private static final String ROTATION_CHANGED_ACTION = "org.mitre.svmp.action.ROTATION_CHANGED";
 
     private boolean mEnabled;
@@ -78,8 +72,9 @@ public abstract class WindowOrientationListener {
      */
     private WindowOrientationListener(Context context, int rate) {
         // register a broadcast receiver to determine screen rotation
+        // only receives broadcasts from senders who have the SVMP_BROADCAST permission
         context.registerReceiver(
-                rotationInfoReceiver, new IntentFilter(ROTATION_CHANGED_ACTION));
+                rotationInfoReceiver, new IntentFilter(ROTATION_CHANGED_ACTION), SVMP_BROADCAST_PERMISSION, null);
     }
 
     // SVMP addition to process rotation info messages
@@ -176,3 +171,4 @@ public abstract class WindowOrientationListener {
         mLogEnabled = enable;
     }
 }
+// End SVMP rotation injection code
