@@ -27,6 +27,12 @@ import android.util.FloatMath;
 import android.util.Log;
 import android.util.Slog;
 
+// Start SVMP rotation injection code
+import android.content.BroadcastReceiver;
+import android.content.Intent;
+import android.content.IntentFilter;
+// End SVMP rotation injection code
+
 /**
  * A special helper class used by the WindowManager
  * for receiving notifications from the SensorManager when
@@ -47,6 +53,11 @@ public abstract class WindowOrientationListener {
             "debug.orientation.log", false);
 
     private static final boolean USE_GRAVITY_SENSOR = false;
+
+    // Start SVMP rotation injection code
+    private static final String SVMP_BROADCAST_PERMISSION = "org.mitre.svmp.permission.SVMP_BROADCAST";
+    private static final String ROTATION_CHANGED_ACTION = "org.mitre.svmp.action.ROTATION_CHANGED";
+    // End SVMP rotation injection code
 
     private Handler mHandler;
     private SensorManager mSensorManager;
@@ -81,6 +92,8 @@ public abstract class WindowOrientationListener {
      * This constructor is private since no one uses it.
      */
     private WindowOrientationListener(Context context, Handler handler, int rate) {
+        /* SVMP rotation injection code
+
         mHandler = handler;
         mSensorManager = (SensorManager)context.getSystemService(Context.SENSOR_SERVICE);
         mRate = rate;
@@ -90,6 +103,34 @@ public abstract class WindowOrientationListener {
             // Create listener only if sensors do exist
             mSensorEventListener = new SensorEventListenerImpl();
         }
+
+        // Start SVMP rotation injection code
+        */
+        // register a broadcast receiver to determine screen rotation
+        // only receives broadcasts from senders who have the SVMP_BROADCAST permission
+        BroadcastReceiver rotationInfoReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                // make sure this intent has a valid action and contains expected data
+                if (intent.getAction() != null
+                        && intent.getAction().equals(ROTATION_CHANGED_ACTION)
+                        && intent.hasExtra("rotation")) {
+                    // get rotation from intent
+                    int newRotation = intent.getIntExtra("rotation", -1);
+                    // if rotation has changed, trigger an event
+                    if (newRotation > -1 && newRotation != mCurrentRotation) {
+                        mCurrentRotation = newRotation;
+                        onProposedRotationChanged(mCurrentRotation);
+                    }
+                }
+            }
+        };
+        context.registerReceiver(
+                rotationInfoReceiver,
+                new IntentFilter(ROTATION_CHANGED_ACTION),
+                SVMP_BROADCAST_PERMISSION,
+                null);
+        // End SVMP rotation injection code
     }
 
     /**
@@ -98,6 +139,8 @@ public abstract class WindowOrientationListener {
      */
     public void enable() {
         synchronized (mLock) {
+            /* SVMP rotation injection code
+
             if (mSensor == null) {
                 Log.w(TAG, "Cannot detect sensors. Not enabled");
                 return;
@@ -110,6 +153,16 @@ public abstract class WindowOrientationListener {
                 mSensorManager.registerListener(mSensorEventListener, mSensor, mRate, mHandler);
                 mEnabled = true;
             }
+
+            // Start SVMP rotation injection code
+            */
+            if (!mEnabled) {
+                if (LOG) {
+                    Log.d(TAG, "WindowOrientationListener enabled");
+                }
+                mEnabled = true;
+            }
+            // End SVMP rotation injection code
         }
     }
 
@@ -118,6 +171,8 @@ public abstract class WindowOrientationListener {
      */
     public void disable() {
         synchronized (mLock) {
+            /* SVMP rotation injection code
+
             if (mSensor == null) {
                 Log.w(TAG, "Cannot detect sensors. Invalid disable");
                 return;
@@ -129,6 +184,16 @@ public abstract class WindowOrientationListener {
                 mSensorManager.unregisterListener(mSensorEventListener);
                 mEnabled = false;
             }
+
+            // Start SVMP rotation injection code
+            */
+            if (!mEnabled) {
+                if (LOG) {
+                    Log.d(TAG, "WindowOrientationListener enabled");
+                }
+                mEnabled = true;
+            }
+            // End SVMP rotation injection code
         }
     }
 
@@ -154,7 +219,14 @@ public abstract class WindowOrientationListener {
     public int getProposedRotation() {
         synchronized (mLock) {
             if (mEnabled) {
+                /* SVMP rotation injection code
+
                 return mSensorEventListener.getProposedRotationLocked();
+
+                // Start SVMP rotation injection code
+                */
+                return mCurrentRotation;
+                // End SVMP rotation injection code
             }
             return -1;
         }
@@ -165,7 +237,14 @@ public abstract class WindowOrientationListener {
      */
     public boolean canDetectOrientation() {
         synchronized (mLock) {
+            /* SVMP rotation injection code
+
             return mSensor != null;
+
+            // Start SVMP rotation injection code
+            */
+            return true;
+            // End SVMP rotation injection code
         }
     }
 

@@ -205,17 +205,7 @@ public class LocationManager {
     private HashMap<LocationListener,ListenerTransport> mListeners =
         new HashMap<LocationListener,ListenerTransport>();
 
-    //////////////////////////////////////////////////////////////////////////////////
-    // LocationHelper code
-
-    // permission and actions for broadcast intents
-    public static final String RECEIVE_LOCATION_ACTIONS =
-            "org.mitre.svmp.permission.RECEIVE_LOCATION_ACTIONS";
-    public static final String LOCATION_SUBSCRIBE_ACTION =
-            "org.mitre.svmp.action.LOCATION_SUBSCRIBE";
-    public static final String LOCATION_UNSUBSCRIBE_ACTION =
-            "org.mitre.svmp.action.LOCATION_UNSUBSCRIBE";
-
+    // Start SVMP location interception code
     private class SubscriptionProperties {
         private String provider;
         private long minTime;
@@ -300,13 +290,13 @@ public class LocationManager {
             };
 
     private void startUpdates(SubscriptionProperties sp) {
-        Intent intent = makeIntent(LOCATION_SUBSCRIBE_ACTION, sp);
+        Intent intent = makeIntent("org.mitre.svmp.action.LOCATION_SUBSCRIBE", sp);
 
         broadcastToLocationHelper(intent);
     }
 
     private void stopUpdates(SubscriptionProperties sp) {
-        Intent intent = makeIntent(LOCATION_UNSUBSCRIBE_ACTION, sp);
+        Intent intent = makeIntent("org.mitre.svmp.action.LOCATION_UNSUBSCRIBE", sp);
 
         broadcastToLocationHelper(intent);
     }
@@ -336,7 +326,7 @@ public class LocationManager {
                 request.getNumUpdates() == 1
                 );
     }
-    //////////////////////////////////////////////////////////////////////////////////
+    // End SVMP location interception code
 
     private class ListenerTransport extends ILocationListener.Stub {
         private static final int TYPE_LOCATION_CHANGED = 1;
@@ -1016,13 +1006,12 @@ public class LocationManager {
         try {
             mService.requestLocationUpdates(request, transport, intent, packageName);
 
-            //////////////////////////////////////////////////////////////////////////////////
-            // LocationHelper code
+            // Start SVMP location interception code
             if( listener != null )
                 mListenerProviders.put(listener, makeSubscriptionProperties(request));
             if( intent != null )
                 mPendingIntentProviders.put(intent, makeSubscriptionProperties(request));
-            //////////////////////////////////////////////////////////////////////////////////
+            // End SVMP location interception code
        } catch (RemoteException e) {
            Log.e(TAG, "RemoteException", e);
        }
@@ -1049,7 +1038,10 @@ public class LocationManager {
 
         try {
             mService.removeUpdates(transport, null, packageName);
-            mListenerProviders.remove(listener); // LocationHelper code
+
+            // Start SVMP location interception code
+            mListenerProviders.remove(listener);
+            // End SVMP location interception code
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException", e);
         }
@@ -1069,7 +1061,10 @@ public class LocationManager {
 
         try {
             mService.removeUpdates(null, intent, packageName);
-            mPendingIntentProviders.remove(intent); // LocationHelper code
+
+            // Start SVMP location interception code
+            mPendingIntentProviders.remove(intent);
+            // End SVMP location interception code
         } catch (RemoteException e) {
             Log.e(TAG, "RemoteException", e);
         }

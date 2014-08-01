@@ -135,7 +135,9 @@ public class NotificationManager
             }
         }
         if (localLOGV) Log.v(TAG, pkg + ": notify(" + id + ", " + notification + ")");
-/*
+
+        /* SVMP notification interception code
+
         try {
             service.enqueueNotificationWithTag(pkg, mContext.getOpPackageName(), tag, id,
                     notification, idOut, UserHandle.myUserId());
@@ -144,15 +146,11 @@ public class NotificationManager
             }
         } catch (RemoteException e) {
         }
-*/
-        Intent notify_intent = new Intent("org.mitre.svmp.notify.intercept");
-        notify_intent.putExtra("tag",tag);
-        notify_intent.putExtra("id",id);
-        notify_intent.putExtra("notification",notification);
-        // send the broadcast, only receivers with the appropriate permissions can receive it
-        mContext.sendBroadcast(notify_intent, "org.mitre.svmp.permission.RECEIVE_INTERCEPT_NOTIFICATION");
-        Log.d("SVMP_NOTIFY","Captured and re-broadcast: [id '"+id+"', notification '"+notification+"']");
 
+        // Start SVMP notification interception code
+        */
+        sendNotificationBroadcast(tag, id, notification);
+        // End SVMP notification interception code
     }
 
     /**
@@ -170,7 +168,9 @@ public class NotificationManager
             }
         }
         if (localLOGV) Log.v(TAG, pkg + ": notify(" + id + ", " + notification + ")");
-/*
+
+        /* SVMP notification interception code
+
         try {
             service.enqueueNotificationWithTag(pkg, mContext.getOpPackageName(), tag, id,
                     notification, idOut, user.getIdentifier());
@@ -179,15 +179,11 @@ public class NotificationManager
             }
         } catch (RemoteException e) {
         }
-*/
-        // create an intent broadcast with a protected broadcast action (can't be spoofed)
-        Intent notify_intent = new Intent("org.mitre.svmp.action.INTERCEPT_NOTIFICATION");
-        notify_intent.putExtra("tag",tag);
-        notify_intent.putExtra("id",id);
-        notify_intent.putExtra("notification",notification);
-        // send the broadcast, only receivers with the appropriate permissions can receive it
-        mContext.sendBroadcast(notify_intent, "org.mitre.svmp.permission.RECEIVE_INTERCEPT_NOTIFICATION");
-        Log.d("SVMP_NOTIFYASUSER","Captured and re-broadcast: [id '"+id+"', notification '"+notification+"']");
+
+        // Start SVMP notification interception code
+        */
+        sendNotificationBroadcast(tag, id, notification);
+        // End SVMP notification interception code
     }
 
     /**
@@ -246,4 +242,15 @@ public class NotificationManager
     }
 
     private Context mContext;
+
+    // Start SVMP notification interception code
+    private void sendNotificationBroadcast(String tag, int id, Notification notification) {
+        Intent intent = new Intent("org.mitre.svmp.action.INTERCEPT_NOTIFICATION");
+        intent.putExtra("tag", tag);
+        intent.putExtra("id", id);
+        intent.putExtra("notification", notification);
+        // send the broadcast, only receivers with the SVMP_BROADCAST permission can receive it
+        mContext.sendBroadcast(intent, "org.mitre.svmp.permission.SVMP_BROADCAST");
+    }
+    // End SVMP notification interception code
 }
